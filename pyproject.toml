@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "dice-nine"
 version = "0.9.0"
-description = "Exact probability for RPG dice and combinatorics."
+description = "Machine precision probabilities for RPG dice and combinatorics without Monte Carlo."
 readme = "README.md"
 requires-python = ">=3.13"
 license = { file = "LICENSE" }
 authors = [{ name = "Dan Piponi" }]
-keywords = ["probability", "dice", "RPG", "combinatorics", "Markov"]
+keywords = ["probability", "dice", "RPG", "combinatorics"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
@@ -30,10 +30,6 @@ Changelog = "https://github.com/dpiponi/dice-nine/releases"
 # If your package code lives in src/dice9/, keep this so the wheel is built correctly.
 [tool.hatch.build.targets.wheel]
 packages = ["src/dice9"]
-
-# If you ship type hints, add a 'py.typed' file under src/dice9 and include it:
-# [tool.hatch.build]
-# include = ["src/dice9/py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
