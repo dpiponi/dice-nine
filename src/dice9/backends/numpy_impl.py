@@ -1,6 +1,5 @@
 import builtins
 import numpy as np
-import scipy
 
 # =============================================================================
 # Scalar / Python interop
@@ -416,6 +415,39 @@ def inv_tables(primes):
 
     return inv
 
+import numpy as np
+
+def logsumexp(x, axis=None, keepdims=False):
+    """
+    Compute log(sum(exp(x))) in a numerically stable way.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array.
+    axis : int or tuple of ints, optional
+        Axis or axes over which the sum is taken.
+    keepdims : bool, optional
+        If True, retains reduced dimensions with length 1.
+
+    Returns
+    -------
+    res : ndarray
+        The result, log(sum(exp(x))).
+    """
+    x = np.asarray(x)
+    # Find max along the reduction axis for numerical stability
+    xmax = np.max(x, axis=axis, keepdims=True)
+    # Avoid overflow when all entries are -inf
+    xmax = np.where(np.isfinite(xmax), xmax, 0)
+    # Compute the shifted exponentials
+    shifted = np.exp(x - xmax)
+    # Sum them, take the log, and add back the shift
+    s = np.sum(shifted, axis=axis, keepdims=True)
+    out = np.log(s) + xmax
+    if not keepdims:
+        out = np.squeeze(out, axis=axis)
+    return out
 
 # =============================================================================
 # Public aliases (formerly 'exported' table)
@@ -510,7 +542,7 @@ bitwise_or = np.bitwise_or
 invert = np.invert
 left_shift = np.left_shift
 unsorted_segment_logsumexp = np_unsorted_segment_logsumexp
-reduce_logsumexp = scipy.special.logsumexp
+reduce_logsumexp = logsumexp
 logaddexp = np.logaddexp
 convert_to_tensor = np.asarray
 moveaxis = np.moveaxis
