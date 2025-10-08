@@ -1,49 +1,69 @@
-# test_cmds.py
-
-import unittest
+import pytest
 import math
-
 import dice9 as d9
 
-#from dice9.problib import *
-
-class TestProbLangCmds(unittest.TestCase):
+class TestProbLangCmds:
     def test_return(self):
+        @d9.dist
         def two_coins():
             x = d(2)
             y = d(2)
             return x, y
 
-        pmf = d9.run(two_coins)
+        pmf = two_coins()
 
         for x in range(1, 3):
             for y in range(1, 3):
-                self.assertAlmostEqual(pmf[(x, y)], 0.25, places=5)
+                assert pmf[(x, y)] == pytest.approx(0.25, rel=1e-5)
 
-        self.assertEqual(len(pmf), 4)
+        assert len(pmf) == 4
 
-    def test_return2(self):
+    def test_return3(self):
         def g():
-            return x
+            return d(6), d(6)
 
-        with self.assertRaisesRegex(ValueError, r".*move.*"):
-            pmf = d9.run(g)
+        @d9.dist
+        def f():
+            x, y = g()
+            return x + y
+
+        pmf = f()
+        assert pmf[2] == pytest.approx(1 / 36)
+        assert pmf[7] == pytest.approx(1 / 6)
+        assert pmf[12] == pytest.approx(1 / 36)
 
     def test_for1(self):
+        @d9.dist
         def sum_ten_coins():
             x = 0
             for i in range(10):
                 x = x + d(2)
             return x
 
-        pmf = d9.run(sum_ten_coins)
+        pmf = sum_ten_coins()
 
         for x in range(10, 21):
-            self.assertAlmostEqual(pmf[(x,)], math.comb(10, x - 10) * 2**-10, places=5)
+            assert pmf[x] == pytest.approx(math.comb(10, x - 10) * 2**-10, rel=1e-5)
 
-        self.assertEqual(len(pmf), 11)
+        assert len(pmf) == 11
+
+    def test_for2a(self):
+        @d9.dist
+        def sum_ten_coins():
+            long_name = 0
+            for i in range(10):
+                long_name = long_name + d(2)
+            return long_name
+
+        pmf = sum_ten_coins()
+
+        for x in range(10, 21):
+            assert pmf[x] == pytest.approx(math.comb(10, x - 10) * 2**-10, rel=1e-5)
+
+        assert len(pmf) == 11
 
     def test_for2(self):
+        @d9.dist
         def sum_six_coins():
             x = 0
             for i in range(2):
@@ -51,14 +71,15 @@ class TestProbLangCmds(unittest.TestCase):
                     x = x + d(2)
             return x
 
-        pmf = d9.run(sum_six_coins)
+        pmf = sum_six_coins()
 
         for x in range(6, 13):
-            self.assertAlmostEqual(pmf[(x,)], math.comb(6, x - 6) * 2**-6, places=5)
+            assert pmf[x] == pytest.approx(math.comb(6, x - 6) * 2**-6, rel=1e-5)
 
-        self.assertEqual(len(pmf), 7)
+        assert len(pmf) == 7
 
     def test_if1(self):
+        @d9.dist
         def two_or_three():
             x = d(2)
             if x == 1:
@@ -67,14 +88,15 @@ class TestProbLangCmds(unittest.TestCase):
                 y = 3
             return y
 
-        pmf = d9.run(two_or_three)
+        pmf = two_or_three()
 
         for x in range(2, 4):
-            self.assertAlmostEqual(pmf[(x,)], 0.5, places=5)
+            assert pmf[x] == pytest.approx(0.5, rel=1e-5)
 
-        self.assertEqual(len(pmf), 2)
+        assert len(pmf) == 2
 
     def test_if2(self):
+        @d9.dist
         def two34or5():
             x = d(2)
             if x == 1:
@@ -91,14 +113,15 @@ class TestProbLangCmds(unittest.TestCase):
                     z = 5
             return z
 
-        pmf = d9.run(two34or5)
+        pmf = two34or5()
 
         for x in range(2, 6):
-            self.assertAlmostEqual(pmf[(x,)], 0.25, places=5)
+            assert pmf[x] == pytest.approx(0.25, rel=1e-5)
 
-        self.assertEqual(len(pmf), 4)
+        assert len(pmf) == 4
 
     def test_if3(self):
+        @d9.dist
         def f():
             hp2 = 1
 
@@ -107,74 +130,78 @@ class TestProbLangCmds(unittest.TestCase):
 
             return hp2
 
-        pmf = d9.run(f)
+        pmf = f()
 
     def test_call1(self):
         def f(x):
             return x + d(2)
 
+        @d9.dist
         def g():
             return f(0)
 
-        pmf = d9.run(g)
+        pmf = g()
 
-        self.assertAlmostEqual(pmf[(1,)], 0.5, places=5)
-        self.assertAlmostEqual(pmf[(2,)], 0.5, places=5)
+        assert pmf[1] == pytest.approx(0.5, rel=1e-5)
+        assert pmf[2] == pytest.approx(0.5, rel=1e-5)
 
     def test_call2(self):
         def f(x):
             return x + d(2)
 
+        @d9.dist
         def g():
             return f(f(0))
 
-        pmf = d9.run(g)
+        pmf = g()
 
-        self.assertAlmostEqual(pmf[(2,)], 0.25, places=5)
-        self.assertAlmostEqual(pmf[(3,)], 0.5, places=5)
-        self.assertAlmostEqual(pmf[(4,)], 0.25, places=5)
+        assert pmf[2] == pytest.approx(0.25, rel=1e-5)
+        assert pmf[3] == pytest.approx(0.5, rel=1e-5)
+        assert pmf[4] == pytest.approx(0.25, rel=1e-5)
 
     def test_call3(self):
         def f(x, y):
             return x + y
 
+        @d9.dist
         def g():
             return f(d(2), d(2))
 
-        pmf = d9.run(g)
+        pmf = g()
 
-        self.assertAlmostEqual(pmf[(2,)], 0.25, places=5)
-        self.assertAlmostEqual(pmf[(3,)], 0.5, places=5)
-        self.assertAlmostEqual(pmf[(4,)], 0.25, places=5)
+        assert pmf[2] == pytest.approx(0.25, rel=1e-5)
+        assert pmf[3] == pytest.approx(0.5, rel=1e-5)
+        assert pmf[4] == pytest.approx(0.25, rel=1e-5)
 
     def test_call4(self):
         def f(x, y):
             return x + y
 
+        @d9.dist
         def g():
             return f(0)
 
-        # make a proper error XXX
-        #with self.assertRaisesRegex(KeyError, r".*y.*"):
-        with self.assertRaisesRegex(d9.InterpreterError, r".*Call.*"):
-            pmf = d9.run(g)
+        with pytest.raises(d9.InterpreterError, match=r".*bind.*"):
+            pmf = g()
 
     def test_call5(self):
         def f(x):
             return x + d(6)
 
+        @d9.dist
         def g():
             x = 0
             for i in range(3):
                 x = f(x)
             return x
 
-        pmf = d9.run(g)
-        self.assertAlmostEqual(pmf[(3,)], 1 / 216, places=5)
-        self.assertAlmostEqual(pmf[(10,)], 0.125, places=5)
-        self.assertAlmostEqual(pmf[(18,)], 1 / 216, places=5)
+        pmf = g()
+        assert pmf[3] == pytest.approx(1 / 216, rel=1e-5)
+        assert pmf[10] == pytest.approx(0.125, rel=1e-5)
+        assert pmf[18] == pytest.approx(1 / 216, rel=1e-5)
 
     def test_if_for1(self):
+        @d9.dist
         def f():
             x = 0
             if d(2) == 1:
@@ -185,14 +212,15 @@ class TestProbLangCmds(unittest.TestCase):
                     x += d(3)
             return x
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(2,)], 1 / 18, places=5)
-        self.assertAlmostEqual(pmf[(3,)], 25 / 144, places=5)
-        self.assertAlmostEqual(pmf[(4,)], 51 / 144, places=5)
-        self.assertAlmostEqual(pmf[(5,)], 43 / 144, places=5)
-        self.assertAlmostEqual(pmf[(6,)], 17 / 144, places=5)
+        pmf = f()
+        assert pmf[2] == pytest.approx(1 / 18, rel=1e-5)
+        assert pmf[3] == pytest.approx(25 / 144, rel=1e-5)
+        assert pmf[4] == pytest.approx(51 / 144, rel=1e-5)
+        assert pmf[5] == pytest.approx(43 / 144, rel=1e-5)
+        assert pmf[6] == pytest.approx(17 / 144, rel=1e-5)
 
     def test_for_if1(self):
+        @d9.dist
         def f():
             x = 0
             for i in range(3):
@@ -202,10 +230,11 @@ class TestProbLangCmds(unittest.TestCase):
                     x += d(3)
             return x
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(3,)], (5 / 12)**3, places=5)
+        pmf = f()
+        assert pmf[3] == pytest.approx((5 / 12)**3, rel=1e-5)
 
     def test_for_if2(self):
+        @d9.dist
         def f():
             x = 0
             y = 0
@@ -216,11 +245,12 @@ class TestProbLangCmds(unittest.TestCase):
                     y += d(2)
             return x + y
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(3,)], 1 / 8, places=5)
-        self.assertAlmostEqual(pmf[(6,)], 1 / 8, places=5)
+        pmf = f()
+        assert pmf[3] == pytest.approx(1 / 8, rel=1e-5)
+        assert pmf[6] == pytest.approx(1 / 8, rel=1e-5)
 
     def test_if3(self):
+        @d9.dist
         def f():
             x = d(100)
             y = d(100)
@@ -230,10 +260,11 @@ class TestProbLangCmds(unittest.TestCase):
                 z = 0
             return z
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(1,)], 6 / 10000, places=5)
+        pmf = f()
+        assert pmf[1] == pytest.approx(6 / 10000, rel=1e-5)
 
     def test_if4(self):
+        @d9.dist
         def f():
             x = 0
 
@@ -243,75 +274,99 @@ class TestProbLangCmds(unittest.TestCase):
 
             return x
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(-1,)], 1 / 2, places=5)
-        self.assertAlmostEqual(pmf[(0,)], 1 / 2, places=5)
+        pmf = f()
+        assert pmf[-1] == pytest.approx(1 / 2, rel=1e-5)
+        assert pmf[0] == pytest.approx(1 / 2, rel=1e-5)
 
     def test_if5(self):
+        @d9.dist
         def f():
             x = [1]
             if False:
                 x = zeros(1)
             return x
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[((1,),)], 1, places=5)
+        pmf = f()
+        assert pmf[(1,)] == pytest.approx(1, rel=1e-5)
 
     def test_if6(self):
+        @d9.dist
         def f():
             x = [1]
             if True:
                 x = zeros(1)
             return x
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[((0,),)], 1, places=5)
+        pmf = f()
+        assert pmf[(0,)] == pytest.approx(1, rel=1e-5)
 
     def test_if7(self):
+        @d9.dist
         def f():
             x = 4
             if d(2) == 1:
                 x = d(2)
             return x
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(1,)], 0.25)
-        self.assertAlmostEqual(pmf[(2,)], 0.25)
-        self.assertAlmostEqual(pmf[(4,)], 0.5)
+        pmf = f()
+        assert pmf[1] == pytest.approx(0.25)
+        assert pmf[2] == pytest.approx(0.25)
+        assert pmf[4] == pytest.approx(0.5)
 
     def test_if8(self):
+        @d9.dist
         def f():
             if d(2) == 1:
                 x = 1
             return d(2)
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(1,)], 0.5)
+        pmf = f()
+        assert pmf[1] == pytest.approx(0.5)
 
-    if 0:
-        def test_for3(self):
-            def f():
-                x = constant([2, 3, 4])
-                y = 0
-                for i in x:
-                    y += i
-                return y
+    def test_if9(self):
+        @d9.dist
+        def f():
+            a = d(2)
+            b = d(2)
+            c = d(2)
+            d = d(2)
+            e = d(2)
+            count = 0
+            if e == 1:
+                if d == 1:
+                    count += d(2)
+                else:
+                    count += 10 * d(2)
+            else:
+                if c == 1:
+                    count += 100 * d(2)
+                else:
+                    count += 1000 * d(2)
+            return count
 
-            pmf = d9.run(f)
-            self.assertAlmostEqual(pmf[(9,)], 1, places=5)
+        @d9.dist
+        def g():
+            p = d(2) * 10000
+            return p + f()
+
+        pmf = g()
+        print(pmf)
+        assert pmf[10001] == pytest.approx(1 / 16)
+        assert pmf[22000] == pytest.approx(1 / 16)
 
     def test_for4(self):
+        @d9.dist
         def f():
             xs = []
             for i in range(3):
-                xs = concat([xs, reshape(d(2), [1])], -1)
+                xs = [*xs, d(2)]
             y = 0
             for x in xs:
                 y = y + x
             return y
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(3,)], 1 / 8, places=5)
+        pmf = f()
+        assert pmf[3] == pytest.approx(1 / 8, rel=1e-5)
 
     def test_frame1(self):
         def g(n):
@@ -321,13 +376,14 @@ class TestProbLangCmds(unittest.TestCase):
 
             return result
 
+        @d9.dist
         def f():
             s = g(0)
             s = g(0)
             return s
 
-        pmf = d9.run(f)
-        self.assertAlmostEqual(pmf[(0,)], 1)
+        pmf = f()
+        assert pmf[0] == pytest.approx(1)
 
     def test_recurse1(self):
         def recurse4():
@@ -342,17 +398,19 @@ class TestProbLangCmds(unittest.TestCase):
         def recurse1():
             return recurse2() + recurse2()
 
+        @d9.dist
         def f():
             return recurse1() + recurse1()
 
+        @d9.dist
         def g():
             return sum(*(16 @ d(6)))
 
-        pmf1 = d9.run(f)
-        pmf2 = d9.run(g)
+        pmf1 = f()
+        pmf2 = g()
 
         for i in range(16, 16 * 6 + 1):
-            self.assertAlmostEqual(pmf1[(i,)], pmf2[(i,)])
+            assert pmf1[i] == pytest.approx(pmf2[i])
 
     def test_recurse2(self):
         def g(n):
@@ -362,23 +420,26 @@ class TestProbLangCmds(unittest.TestCase):
                 x = g(n - 1) + g(n - 1)
             return x
 
+        @d9.dist
         def f():
             return g(4)
 
+        @d9.dist
         def h():
             return sum(*(16 @ d(6)))
 
-        pmf1 = d9.run(f)
-        pmf2 = d9.run(h)
+        pmf1 = f()
+        pmf2 = h()
 
         for i in range(16, 16 * 6 + 1):
-            self.assertAlmostEqual(pmf1[(i,)], pmf2[(i,)])
+            assert pmf1[i] == pytest.approx(pmf2[i])
 
     def test_gen_if1(self):
         def g():
             for i in range(2):
                 yield 0
 
+        @d9.dist
         def f():
             y = 0
             for x in g():
@@ -386,9 +447,8 @@ class TestProbLangCmds(unittest.TestCase):
                     y = 0
             return y
 
-        pmf = d9.run(f, squeeze=True)
-        #self.assertAlmostEqual(pmf[0], 1)
-        self.assertEqual(pmf, [0])
+        pmf = f()
+        assert pmf[0] == 1
 
     def test_gen_if2(self):
         def g():
@@ -396,6 +456,7 @@ class TestProbLangCmds(unittest.TestCase):
                 count = 0
                 yield 0
 
+        @d9.dist
         def f():
             x = 0
             for num in g():
@@ -404,9 +465,8 @@ class TestProbLangCmds(unittest.TestCase):
 
             return x
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertEqual(pmf, [0])
-        #self.assertAlmostEqual(pmf[0], 1)
+        pmf = f()
+        assert pmf[0] == 1
 
     def test_gen_del(self):
         def g():
@@ -414,139 +474,247 @@ class TestProbLangCmds(unittest.TestCase):
             del x
             yield x
 
+        @d9.dist
         def f():
             t = 0
             for i in g():
                 t += i
             return t
 
-        with self.assertRaisesRegex(d9.InterpreterError, r".*Call.*"):
-            pmf = d9.run(f)
+        with pytest.raises(d9.InterpreterError, match=r".*not found.*"):
+            pmf = f()
 
     def test_aug1(self):
+        @d9.dist
         def f():
             x = d(2)
             x += 1
             return x
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertAlmostEqual(pmf[2], 1 / 2)
-        self.assertAlmostEqual(pmf[3], 1 / 2)
+        pmf = f()
+        assert pmf[2] == pytest.approx(1 / 2)
+        assert pmf[3] == pytest.approx(1 / 2)
 
     def test_aug2(self):
+        @d9.dist
         def f():
             x = d(2)
             x -= 1
             return x
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertAlmostEqual(pmf[0], 1 / 2)
-        self.assertAlmostEqual(pmf[1], 1 / 2)
+        pmf = f()
+        assert pmf[0] == pytest.approx(1 / 2)
+        assert pmf[1] == pytest.approx(1 / 2)
 
     def test_error1(self):
+        @d9.dist
         def f():
             del a.b
 
-        # with self.assertRaisesRegex(ValueError, r".*not supported.*"):
-        with self.assertRaisesRegex(ValueError, r".*move.*"):
-            pmf = d9.run(f)
+        with pytest.raises(d9.InterpreterError, match=r".*Delet.*"):
+            pmf = f()
 
     def test_gen_for1(self):
         def g(x):
             for i in x:
                 yield i
 
+        @d9.dist
         def f():
             t = 0
             for j in g([1, 2, 3]):
                 t += d(j)
             return t
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertAlmostEqual(pmf[3], 1 / 6)
-        self.assertAlmostEqual(pmf[4], 1 / 3)
-        self.assertAlmostEqual(pmf[5], 1 / 3)
-        self.assertAlmostEqual(pmf[6], 1 / 6)
+        pmf = f()
+        assert pmf[3] == pytest.approx(1 / 6)
+        assert pmf[4] == pytest.approx(1 / 3)
+        assert pmf[5] == pytest.approx(1 / 3)
+        assert pmf[6] == pytest.approx(1 / 6)
 
     def test_assert1(self):
+        @d9.dist(normalize=True)
         def f():
             d = d(6)
             assert d > 1
             return d
 
-        pmf = d9.run(f, normalize=True, squeeze=True)
+        pmf = f()
         for i in range(2, 7):
-            self.assertAlmostEqual(pmf[i], 1 / 5)
+            assert pmf[i] == pytest.approx(1 / 5)
 
     def test_assert2(self):
+        @d9.dist
         def f():
             x = d(2)
             assert x > 2
             return x + d(2)
 
-        # Don't care about result
-        result = d9.run(f)
-        self.assertEqual(len(result), 0)
+        result = f()
+        assert len(result) == 0
 
     def test_args1(self):
+        @d9.dist
         def f(n):
             return d(n)
 
-        pmf = d9.run(f, 8, squeeze=True)
+        pmf = f(8, )
         for i in range(1, 9):
-            self.assertAlmostEqual(pmf[i], 1 / 8)
+            assert pmf[i] == pytest.approx(1 / 8)
 
     def test_args2(self):
+        @d9.dist
         def f(n):
             return d(n)
 
-        with self.assertRaisesRegex(TypeError, r".*Missing positional argument.*"):
-            pmf = d9.run(f)
+        with pytest.raises(TypeError, match=r".*missing.*"):
+            pmf = f()
 
     def test_args3(self):
+        @d9.dist
         def f():
             return d(6)
 
-        with self.assertRaisesRegex(TypeError, r".*Extra argument.*"):
-            pmf = d9.run(f, 17)
+        with pytest.raises(TypeError, match=r".*positional.*"):
+            pmf = f(17)
 
     def test_listcomp1(self):
+        @d9.dist
         def f():
             return reduce_sum([10 * x for x in 3 @ d(6)], -1)
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertAlmostEqual(pmf[30], 1 / 216)
-        self.assertAlmostEqual(pmf[100], 1 / 8)
-        self.assertAlmostEqual(pmf[180], 1 / 216)
+        pmf = f()
+        assert pmf[30] == pytest.approx(1 / 216)
+        assert pmf[100] == pytest.approx(1 / 8)
+        assert pmf[180] == pytest.approx(1 / 216)
 
     def test_stream1(self):
+        @d9.dist
         def f():
             t = 0
             for i in {d(2), d(2)}:
                 t += i
             return t
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertAlmostEqual(pmf[2], 1 / 4)
-        self.assertAlmostEqual(pmf[4], 1 / 4)
+        pmf = f()
+        assert pmf[2] == pytest.approx(1 / 4)
+        assert pmf[4] == pytest.approx(1 / 4)
 
     def test_stream2(self):
+        @d9.dist
         def f():
             return sum(*(2 @ d(3)), *(2 @ d(6)))
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertAlmostEqual(pmf[4], 1 / (3 * 3 * 6 * 6))
-        self.assertAlmostEqual(pmf[18], 1 / (3 * 3 * 6 * 6))
+        pmf = f()
+        assert pmf[4] == pytest.approx(1 / (3 * 3 * 6 * 6))
+        assert pmf[18] == pytest.approx(1 / (3 * 3 * 6 * 6))
 
     def test_genexp_iter(self):
         def grouped():
             for j in range(2):
                 yield sum(*(j for i in range(2)))
 
+        @d9.dist
         def f():
             for i in grouped():
                 x = 1
             return d(6)
 
-        pmf = d9.run(f, squeeze=True)
-        self.assertAlmostEqual(pmf[1], 1 / 6)
+        pmf = f()
+        assert pmf[1] == pytest.approx(1 / 6)
+
+    def test_defarg1(self):
+        def g(x=1+2):
+            return x
+
+        @d9.dist
+        def f():
+            return g(2)
+
+        with pytest.raises(d9.InterpreterError, match=r".*literal.*"):
+            pmf = f()
+
+    def test_defarg2(self):
+        def g(x, /, y):
+            return d(6) + x + y
+
+        @d9.dist
+        def f():
+            return g(2, y=3)
+
+        pmf = f()
+        assert pmf[11] == pytest.approx(1 / 6)
+
+    def test_defarg3(self):
+        def g(x, /, y):
+            return d(6) + x + y
+
+        @d9.dist
+        def f():
+            return g(x=2, y=3)
+
+        with pytest.raises(d9.InterpreterError, match=r".*bind.*"):
+            pmf = f()
+
+    def test_kwonly1(self):
+        def g(n=6):
+            return d(n)
+
+        @d9.dist
+        def f():
+            return g()
+
+        pmf = f()
+        assert pmf[1] == pytest.approx(1 / 6)
+
+    def test_kwonly2(self):
+        def g(n=6):
+            return d(n)
+
+        @d9.dist
+        def f():
+            return g(n=3)
+
+        pmf = f()
+        assert pmf[1] == pytest.approx(1 / 3)
+
+    def test_bad_return(self):
+        @d9.dist
+        def f():
+            if d(2) == 1:
+                return d(2)
+            return 1
+
+        with pytest.raises(d9.InterpreterError, match=r".*return.*"):
+            pmf = f()
+
+    def test_yield_tuple1(self):
+        def f():
+            for i in range(2):
+                yield d(6), d(6)
+
+        @d9.dist
+        def g():
+            total = 0
+            for x, y in f():
+                total += x - y
+            return total
+
+        pmf = g()
+        print(pmf)
+        assert pmf[-10] == pytest.approx(1 / 6**4)
+        assert pmf[10] == pytest.approx(1 / 6**4)
+        
+    def test_args4(self):
+        @d9.dist
+        def f(a, b=10, c=100):
+            return a * d(2) + b * d(4) + c * d(6)
+
+        pmf = f(1)
+        assert pmf[642] == pytest.approx(1 / (2 * 4 * 6))
+
+        pmf = f(1, 100, 10)
+        assert pmf[462] == pytest.approx(1 / (2 * 4 * 6))
+
+        pmf = f(1, c=10, b=100)
+        assert pmf[462] == pytest.approx(1 / (2 * 4 * 6))

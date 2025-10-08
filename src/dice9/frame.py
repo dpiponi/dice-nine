@@ -1,250 +1,260 @@
-from collections import defaultdict
-from dice9.config import sx
-import dice9.config as config
 import logging
+import types
 
-global_next_var = 1000000
+from .factor import Factor, is_reg, Register
+from .environment import Environment
+from .exceptions import InterpreterError
 
-from .factor import Factor, new_register_name, is_reg, Register, check_is_reg
 
 # Variables also serve as the connections to retie branches of conditionals.
 class Frame:
-    def __init__(self, source, environment, allocations, conditional_depth):
-        # Mapping from variable name to underlying register.
+
+    def __init__(self, semiring, source, allocations, conditional_depth):
+        self.semiring = semiring
         self.source = source
-        self.allocations = allocations if allocations else {}
-        self.environment = environment
+        self._allocations = allocations if allocations else {}
         self.conditional_depth = conditional_depth
 
-    def bind(self, name, value):
-        logging.debug(f"Binding {name} = {value}")
-        self.allocations[name] = value
+    def copy(self):
+        return Frame(
+            self.semiring, self.source, self._allocations.copy(), self.conditional_depth
+        )
 
-    def list_allocations(self, env):
-        groups = defaultdict(list)
-        print(f"frame.list_allocations = {self.allocations}")
-        for var, register in self.allocations.items():
-            if is_reg(register):
-                try:
-                    factor_id = id(env.find_factor(register))
-                    groups[factor_id].append((var, register))
-                except:
-                    print(f"var {var}'s register {register} not found in environment")
-        for group, vars in groups.items():
-            print("[")
-            for var, register in vars:
-                value = env[register]
-                print(f"{var}: {value.shape} = {value}")
-            print("]")
+    def bind(self, name, value):#, overwrite=False):
+        # if overwrite:
+        #     context.frame.delete_var_if_defined(name)
+        logging.debug("Binding `%s` = %s.", name, value)
+        self._allocations[name] = value
 
     def __repr__(self):
-        return "Frame<" + ", ".join(
-            f"'{k}': {v}" for k, v in self.allocations.items()) + ">"
-            
-    # Frame
-    def allocate(self, env, new_var_name, value):
-        # if new_var_name in self.allocations:
-        #    raise ValueError(f"Attempt to reallocate {new_var_name}")
-        new_register = new_register_name()
-        factor = Factor.allocate_factor_with_register(new_register, value)
-        check_is_reg(new_register)
-        self.allocations[new_var_name] = new_register
-        env.add_factor(factor)
+        return (
+            "Frame<"
+            + ", ".join(f"'{k}': {v}" for k, v in self._allocations.items())
+            + ">"
+        )
+
+    def show(self, env):
+        from rich.console import Console
+        from rich.table import Table
+        from rich.panel import Panel
+        from rich import box
+
+        if not all(isinstance(v, Register) for v in self._allocations.values()):
+            table = Table(box=box.SIMPLE_HEAVY)
+            table.add_column("var")
+            table.add_column("value")
+            for k, v in self._allocations.items():
+                if not isinstance(v, Register):
+                    table.add_row(str(k), str(v))
+
+            console = Console()
+            console.print(Panel(table, expand=False))
+
+        env.show(self._allocations)
+
+    def __getitem__(self, var_name):
+        return self._allocations[var_name]
+
+    # Creates new independent variable.
+    def allocate_register(self, env, new_var_name, value):
+        reg = env.allocate_register_with_definite_value(value)
+        self._allocations[new_var_name] = reg
+        return reg
+
+    # Allocates new register to variable in same factor as previously
+    # existing register.
+    def allocate_in_same_factor_as_register(self, env, register, new_var_name, value):
+        factor = env.find_factor(register)
+        new_register = Register.new()
+        factor[new_register] = value
+        self._allocations[new_var_name] = new_register
         return new_register
 
-    # Frame
-    def allocate_in_same_factor(self, env, old_var_name, new_var_name, value):
-        # if new_var_name in self.allocations:
-        #    raise ValueError(f"Attempt to reallocate {new_var_name}")
-        old_register = self.allocations[old_var_name]
-        factor = env.find_factor(old_register)
-        new_register = new_register_name()
-        factor[new_register] = value
-        if not is_reg(new_register):
-            raise (f"{new_register} is not a register.")
-        self.allocations[new_var_name] = new_register
+    def allocate_register_with_definite_value(self, env, value):
+        return env.allocate_register_with_definite_value(value)
 
-    def allocate_in_same_factor_as_register(self, env, register, new_var_name, value):
-        # if new_var_name in self.allocations:
-        #    raise ValueError(f"Attempt to reallocate {new_var_name}")
-        factor = env.find_factor(register)
-        new_register = new_register_name()
-        factor[new_register] = value
-        if not is_reg(new_register):
-            raise (f"{new_register} is not a register.")
-        self.allocations[new_var_name] = new_register
+    def delete_value(self, env, value):
+        logging.debug("Deleting `%s`.", value)
 
-    # Frame
-    def allocate_with_probability(self, env, new_var_name, p, value):
-        new_register = env.allocate_factor_with_register_with_probability(
-            p, value
+        match value:
+            case Register():
+                del env[value]
+            case tuple():
+                for x in value:
+                    self.delete_value(env, x)
+            case types.GeneratorType():
+                del value
+            case _:
+                pass
+
+    def duplicate_value(self, env, value):
+        match value:
+            case Register():
+                return env.duplicate_register(value)
+            case tuple():
+                return tuple(self.duplicate_value(env, x) for x in value)
+            case types.GeneratorType():
+                raise InterpreterError("Can't copy a stream.")
+            case _:
+                return value
+
+    def copy_of_var(self, env, var_name):
+        register = self[var_name]
+        new_register = self.duplicate_value(env, register)
+        logging.debug(
+            "Reading from variable `%s` (%s) into %s.",
+            var_name,
+            register,
+            new_register,
         )
-        if not is_reg(new_register):
-            raise (f"{new_register} is not a register.")
-        self.allocations[new_var_name] = new_register
+        return new_register
 
     def split(self, env, condition_register, keep_condition=False):
         env1, env2 = env.split(condition_register, keep_condition=keep_condition)
+        logging.debug(
+            "Split Env(%s) into Env(%s) and Env(%s).",
+            id(env) if env else None,
+            id(env1) if env1 else None,
+            id(env2) if env2 else None,
+        )
 
-        frame1 = None
-        frame2 = None
+        def new_frame(env):
+            return (
+                Frame(
+                    self.semiring,
+                    self.source,
+                    self._allocations.copy(),
+                    self.conditional_depth + 1,
+                )
+                if env
+                else None
+            )
 
-        if env1:
-            frame1 = Frame(self.source, env1, self.allocations.copy(), self.conditional_depth + 1)
-        if env2:
-            frame2 = Frame(self.source, env2, self.allocations.copy(), self.conditional_depth + 1)
+        frame1 = new_frame(env1)
+        frame2 = new_frame(env2)
 
         return frame1, env1, frame2, env2
 
     def semi_split(self, env, condition_register, keep_condition=False):
         env = env.semi_split(condition_register, keep_condition=keep_condition)
-        frame = Frame(self.source, env, self.allocations, self.conditional_depth)
+        frame = Frame(
+            self.semiring, self.source, self._allocations, self.conditional_depth
+        )
         return frame, env
 
-
-    # Frame
     def has_var(self, var_name):
-        return var_name in self.allocations
+        return var_name in self._allocations
 
     def delete_var_and_register(self, env, var_name):
-        register = self.allocations[var_name]
-        logging.debug(f"Deleting variable '{var_name}' currently bound to {register}")
-        if is_reg(register):
-            del env[register]
-        del self.allocations[var_name]
+        value = self._allocations[var_name]
+        logging.debug(
+            "Deleting variable `%s` currently bound to `%s`.", var_name, value
+        )
+        self.delete_value(env, value)
+        del self._allocations[var_name]
 
     def delete_var_if_defined(self, env, var_name):
         if self.has_var(var_name):
             self.delete_var_and_register(env, var_name)
 
     def move(self, var_name):
-        if var_name in self.allocations:
-            register = self.allocations[var_name]
-            del self.allocations[var_name]
+        if var_name in self._allocations:
+            register = self._allocations[var_name]
+            del self._allocations[var_name]
             return register
-        else:
-            raise NameError(f"Variable `{var_name}` not found.")
+        raise InterpreterError(f"Variable `{var_name}` not found.")
 
     def delete_all(self, env):
-        for var, register in self.allocations.items():
-            logging.debug(f"Deleting variable '{var}' currently bound to {register}")
-            if is_reg(register):
-                del env[register]
-        self.allocations = {}
-        
-    if 0:
-        def delete_if_temp(self, var_name):
-            if var_name[0] == '_':
-                self.delete_var_and_register(var_name)
+        for var, register in self._allocations.items():
+            logging.debug(
+                "Deleting variable `%s` currently bound to %s.", var, register
+            )
+            self.delete_value(env, register)
+        self._allocations = {}
 
-    def delete_without_marginalisation(self, env, var_name):
-        register = self.allocations[var_name]
-        env.raw_del(register)
-        del self.allocations[var_name]
-
-    # Frame
     def get(self, env, var_name):
-        register = self.allocations[var_name]
-        return env[register]
+        return env[self._allocations[var_name]]
 
-    def get_register(self, var_name):
-        return self.allocations[var_name]
+    def assign(self, env, var_name, value, clobber):
+        if clobber:
+            self.delete_var_if_defined(env, var_name)
 
-    def get_definite(self, env, var_name):
-        register = self.allocations[var_name]
-        return env.get_definite_value(register)
-        
-    # The variable beging assigned to should not exist
-    # at this point.
-    # old_name = new_name
-    def assign(self, env, old_name, new_name):
-        old_register = new_register_name()
-        self.allocations[old_name] = old_register
-        new_register = self.allocations[new_name]
-        factor = env.find_factor(new_register)
-        factor[old_register] = factor[new_register]
+        if is_reg(value):
+            self.assign_move(env, var_name, value)
+        else:
+            self.bind(var_name, value)
 
-    def assign_copy(self, env, var_name, register):
-        new_register = env.duplicate_register(register)
-        # XXX Should we delete old?
-        # visit_Assign does delete so this is defensive
-        if var_name in self.allocations:
-            old_register = self.allocations[var_name]
-            del env[old_register]
-        self.allocations[var_name] = new_register
+        logging.debug(f"Assigned {var_name} = reg {value}")
 
+    # Sets var to point at new register deleting old register
+    # if var pointed at it.
     def assign_move(self, env, var_name, new_register):
-        if var_name in self.allocations:
-            old_register = self.allocations[var_name]
+        if var_name in self._allocations:
+            old_register = self._allocations[var_name]
             del env[old_register]
-        self.allocations[var_name] = new_register
+        self._allocations[var_name] = new_register
+        return new_register
 
-    # ???
-    def assign_from_register(self, env, var_name, new_register):
-        old_register = new_register_name()
-        self.allocations[var_name] = old_register
-        # new_register = self.allocations[new_name]
-        if not is_reg(new_register):
-            raise ValueError(f"{new_register} is not a register.")
-        factor = env.find_factor(new_register)
-        factor[old_register] = factor[new_register]
+    @staticmethod
+    def rejoin_vars(handled, allocations1, env1, allocations2, env2):
+        allocations = {}
+        pairs = []
 
-    # Frame
-    def un_op2(self, env, source_var, op):
-        destination_var = fresh_var_name()
-        source_register = self.allocations[source_var]
-        if not is_reg(source_register):
-            raise ValueError(f"{source_register} is not a register.")
-        destination_register = env.unary_op(source_register, op)
-        if not is_reg(destination_register):
-            raise ValueError(f"{destination_register} is not a register.")
-        self.allocations[destination_var] = destination_register
-        return destination_var
-                        
-    def bin_op2(self, env, left_var, right_var, op):
-        destination_var = fresh_var_name()
-        left_register = self.allocations[left_var]
-        right_register = self.allocations[right_var]
-        destination_register = env.binary_op(
-            left_register, right_register, op
+        common_vars = set(allocations1.keys()) & set(allocations2.keys())
+        logging.debug("Variables to merge: %s.", common_vars)
+        for var in common_vars:
+            val1 = allocations1[var]
+            val2 = allocations2[var]
+
+            if val2 is None:
+                logging.debug(
+                    "`%s` is in the True branch of a condition but not the False branch.",
+                    var,
+                )
+                continue
+
+            is_reg1, is_reg2 = is_reg(val1), is_reg(val2)
+
+            if not is_reg1 and not is_reg2 and val1 == val2:
+                allocations[var] = val1
+                continue
+
+            src1 = env1.promote(val1)
+            src2 = env2.promote(val2)
+
+            new_reg = Register.new()
+            pairs.append((src1, src2, new_reg))
+            logging.debug(
+                "Merging %s in env #%s and %s in env #%s into %s",
+                src1,
+                id(env1),
+                src2,
+                id(env2),
+                new_reg,
+            )
+            handled.add(src1)
+            allocations[var] = new_reg
+
+        return pairs, allocations
+
+    @staticmethod
+    def rejoin_frames(frame1, env1, frame2, env2):
+        handled = set()
+
+        # Rejoin named variables
+        pairs, allocations = Frame.rejoin_vars(
+            handled, frame1._allocations, env1, frame2._allocations, env2
         )
-        self.allocations[destination_var] = destination_register
-        return destination_var
-                
-    def bin_op_direct2(self, env, left_var, right_var, op):
-        destination_var = fresh_var_name()
-        left_register = self.allocations[left_var]
-        right_register = self.allocations[right_var]
-        destination_register = env.binary_op_direct(
-            left_register, right_register, op
-        )
-        self.allocations[destination_var] = destination_register
-        return destination_var
+        # Rejoin registers not named in current frme
+        new_factor = Factor.rejoin_factors(handled, pairs, env1.factors, env2.factors)
 
-    def multi_op_direct2(self, env, vars, op):
-        destination_var = fresh_var_name()
-        registers = [self.allocations[var] for var in vars]
-        #left_register = self.allocations[left_var]
-        #right_register = self.allocations[right_var]
-        destination_register = env.multi_op_direct(
-            registers, op
+        new_env = Environment(frame1.semiring, [new_factor])
+        return (
+            Frame(
+                frame1.semiring,
+                frame1.source,
+                allocations,
+                frame1.conditional_depth - 1,
+            ),
+            new_env,
         )
-        self.allocations[destination_var] = destination_register
-        return destination_var
-        
-    if 0:
-        # Frame
-        def dd(self, var_name, n_var):
-            destination_register = new_register_name()
-            n_register = self.allocations[n_var]
-            factor = self.environment.find_factor(n_register)
-            probs, rolls, indices = sx.dd_helper(factor[n_register])
-            factor.p = sx.gather(factor.p, indices) * probs
-            for var in factor._values:
-                factor._values[var] = sx.gather(factor._values[var], indices)
-            factor._values[destination_register] = rolls
-            self.allocations[var_name] = destination_register
-            return var_name
-
-#        def dump(self):
-#            for name, value in self.allocations.items():

@@ -1,6 +1,0 @@
-echo 'numpy tests'
-export PL_PLATFORM=np; python -m unittest discover
-echo 'tensorflow tests'
-export PL_PLATFORM=tf; python -m unittest discover
-echo 'torch tests'
-export PL_PLATFORM=torch; python -m unittest discover

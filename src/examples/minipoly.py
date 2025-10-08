@@ -1,6 +1,14 @@
 import math
-import dice9 as pl
-pl.use('tf', profile=False)
+from rich.logging import RichHandler, Console
+import logging
+import dice9 as d9
+
+if 0:
+    console = Console(force_terminal=True)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(message)s",
+        handlers=[RichHandler(markup=True, show_time=False, console=console)])
 
 # +-----+-----+-----+-----+
 # |Go to|     |7: $5|     |
@@ -40,6 +48,7 @@ pl.use('tf', profile=False)
 # (16,) 0.012814442118846737
 # (17,) 0.004363416747240638
 
+@d9.dist
 def game():
     player1 = 0
     player2 = 0
@@ -50,55 +59,51 @@ def game():
     rent = [1, 1, 2, 2]
     owners = [0, 0, 0, 0]
 
-    for t in range(5):
+    for t in range(4):
         print("round", t)
         if money1 > 0 and money2 > 0:
-            player1 = ((player1) + d(6)) % 12
+            player1 = (player1 + d(6)) % 12
             if player1 % 3 == 2:
                 # Chance!
-                money1 -= 1 if d(2) == 1 else 5
+                money1 = max(0, money1 - (1 if d(2) == 1 else 5))
 
             if player1 % 3 == 1:
                 prop = player1 // 3
                 if owners[prop] == 0:
-                    if price[prop] > 0 and money1 >= price[prop]:
+                    if money1 >= price[prop]:
                         # Buy property
-                        owners += one_hot(prop, 4)
-                        money1 -= price[prop]
-                if owners[prop] == 2:
+                        owners[prop] = 1
+                        money1 = max(0, money1 - price[prop])
+                elif owners[prop] == 2:
                     # Pay rent
-                    money1 -= rent[prop]
-                    money2 += rent[prop]
+                    r = rent[prop]
+                    money1 = max(0, money1 - r)
+                    money2 += r
                 # del prop
 
-            money1 = max((money1), 0)
-
         if money1 > 0 and money2 > 0:
-            player2 = ((player2) + d(6)) % 12
+            player2 = (player2 + d(6)) % 12
             if player2 % 3 == 2:
                 # Chqnce!
-                money2 -= 1 if d(2) == 1 else 5
+                money2 = max(0, money2 - (1 if d(2) == 1 else 5))
 
             if player2 % 3 == 1:
                 prop = player2 // 3
                 if owners[prop] == 0:
-                    if price[prop] > 0 and money2 >= price[prop]:
+                    if money2 >= price[prop]:
                         # Buy property
-                        owners += 2 * one_hot(prop, 4)
-                        money2 -= price[prop]
-                if owners[prop] == 1:
+                        owners[prop] = 2
+                        money2 = max(0, money2 - price[prop])
+                elif owners[prop] == 1:
                     # Pay rent
-                    money2 -= rent[prop]
-                    money1 += rent[prop]
+                    r = rent[prop]
+                    money2 = max(0, money2 - r)
+                    money1 += r
                 # del prop
-
-            money2 = max((money2), 0)
-
-        # __listvars__()
 
     return money1
 
-result = pl.run(game)
+result = game()
 
 for x, p in result.items():
     print(x, p)

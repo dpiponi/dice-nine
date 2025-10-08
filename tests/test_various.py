@@ -1,56 +1,64 @@
-# common.py
-
 import math
-import unittest
-
+import pytest
 import dice9 as d9
+from pytest import approx
+from fractions import Fraction
 
-# from dice9.problib import *
 
-# standard Python functions
-class TestProbLang(unittest.TestCase):
-    def coin_flip(self):
-        def f1():
-            x = d(2)
-            return x
+class TestProbLang:
 
-        pdf = d9.run(coin_flip)
+    def test1(self):
 
-        for x in range(1, 3):
-            self.assertAlmostEqual(pdf[(x,)], 0.5, places=5)
+        @d9.dist
+        def coin_flip(self):
 
-        self.assertEqual(len(pdf), 2)
+            def f1():
+                x = d(2)
+                return x
+
+            pdf = coin_flip()
+
+            for x in range(1, 3):
+                assert pdf[x] == approx(0.5, rel=1e-5)
+
+            assert len(pdf) == 2
 
     def test2(self):
+
+        @d9.dist
         def two_coins():
             x = d(2)
             y = d(2)
             return x, y
 
-        pdf = d9.run(two_coins)
+        pdf = two_coins()
 
         for x in range(1, 3):
             for y in range(1, 3):
-                self.assertAlmostEqual(pdf[(x, y)], 0.25, places=5)
+                assert pdf[(x, y)] == approx(0.25, rel=1e-5)
 
-        self.assertEqual(len(pdf), 4)
+        assert len(pdf) == 4
 
     def test3(self):
+
+        @d9.dist
         def sum_two_coins():
             x = d(2)
             y = d(2)
             z = x + y
             return z
 
-        pdf = d9.run(sum_two_coins)
+        pdf = sum_two_coins()
 
-        self.assertAlmostEqual(pdf[(2,)], 0.25, places=5)
-        self.assertAlmostEqual(pdf[(3,)], 0.5, places=5)
-        self.assertAlmostEqual(pdf[(4,)], 0.25, places=5)
+        assert pdf[2] == approx(0.25, rel=1e-5)
+        assert pdf[3] == approx(0.5, rel=1e-5)
+        assert pdf[4] == approx(0.25, rel=1e-5)
 
-        self.assertEqual(len(pdf), 3)
+        assert len(pdf) == 3
 
     def test4(self):
+
+        @d9.dist
         def two_or_three():
             x = d(2)
             if x == 1:
@@ -59,28 +67,32 @@ class TestProbLang(unittest.TestCase):
                 y = 3
             return y
 
-        pdf = d9.run(two_or_three)
+        pdf = two_or_three()
 
         for x in range(2, 4):
-            self.assertAlmostEqual(pdf[(x,)], 0.5, places=5)
+            assert pdf[x] == approx(0.5, rel=1e-5)
 
-        self.assertEqual(len(pdf), 2)
+        assert len(pdf) == 2
 
     def test_sum_ten_coins(self):
+
+        @d9.dist
         def sum_ten_coins():
             x = 0
             for i in range(10):
                 x = x + d(2)
             return x
 
-        pdf = d9.run(sum_ten_coins)
+        pdf = sum_ten_coins()
 
         for x in range(10, 21):
-            self.assertAlmostEqual(pdf[(x,)], math.comb(10, x - 10) * 2**-10, places=5)
+            assert pdf[x] == approx(math.comb(10, x - 10) * 2**-10, rel=1e-5)
 
-        self.assertEqual(len(pdf), 11)
+        assert len(pdf) == 11
 
     def test_fight(self):
+
+        @d9.dist
         def fight():
             hp1 = 4
             hp2 = 4
@@ -91,7 +103,7 @@ class TestProbLang(unittest.TestCase):
                     hp1 = max(hp1 - d(4), 0)
             return hp1, hp2
 
-        pdf = d9.run(fight)
+        pdf = fight()
 
         matrix = [
             [
@@ -134,22 +146,24 @@ class TestProbLang(unittest.TestCase):
         for i in range(5):
             for j in range(5):
                 if matrix[i][j] > 0:
-                    self.assertAlmostEqual(pdf[(j, i)], matrix[i][j], places=5)
+                    assert pdf[(j, i)] == approx(matrix[i][j], rel=1e-5)
 
     def test9(self):
+
+        @d9.dist
         def f9():
             dice = []
-            dice = concat([[d(6)], dice], -1)
+            dice = [d(6), *dice]
             for i in range(12):
-                dice = concat([[d(6)], dice], -1)
+                dice = [d(6), *dice]
                 dice = sort(dice, -1)
             median = dice[6]
             return median
 
         def binomial_cdf(n: int, p: float, k: int) -> float:
             return sum(
-                math.comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(0, k + 1)
-            )
+                math.comb(n, i) * p**i * (1 - p)**(n - i)
+                for i in range(0, k + 1))
 
         def median_cdf(N: int, m: int) -> float:
             k = (N - 1) // 2
@@ -157,20 +171,13 @@ class TestProbLang(unittest.TestCase):
             cdf_m_1 = 1 - binomial_cdf(N, (m - 1) / 6, k)
             return cdf_m - cdf_m_1
 
-        median_dist = d9.run(f9)
+        median_dist = f9()
         for i in range(1, 7):
-            self.assertAlmostEqual(median_dist[(i,)], median_cdf(13, i))
-
-#    def test11(self):
-#        def binary_det():
-#            x = list(16 @ d(2))
-#            m = reshape(x, [4, 4])
-#            return det(m) % 2
-#
-#        singular_dist = d9.run(binary_det)
-#        self.assertAlmostEqual(singular_dist[(True,)], 315 / 1024)
+            assert median_dist[i] == approx(median_cdf(13, i))
 
     def test_roll_three(self):
+
+        @d9.dist
         def roll_three():
             dice = list(3 @ d(6))
             total = 0
@@ -178,7 +185,7 @@ class TestProbLang(unittest.TestCase):
                 total = total + dice[i]
             return total
 
-        total = d9.run(roll_three)
+        total = roll_three()
 
         expected = {
             3: 0.004629629629629629,
@@ -199,10 +206,11 @@ class TestProbLang(unittest.TestCase):
             18: 0.004629629629629629,
         }
         for i in range(4, 19):
-            self.assertAlmostEqual(total[(i,)], expected[i])
+            assert total[i] == approx(expected[i])
 
-    # exponentially tilted
     def test13(self):
+
+        @d9.dist
         def conditional_sum_dice():
             init = d(6)
             total = init
@@ -210,7 +218,7 @@ class TestProbLang(unittest.TestCase):
                 total = total + d(6)
             return init, (total == 200)
 
-        result = d9.run(conditional_sum_dice)
+        result = conditional_sum_dice()
 
         p = [result[(i, True)] for i in range(1, 7)]
         total = sum(p)
@@ -226,9 +234,11 @@ class TestProbLang(unittest.TestCase):
         ]
 
         for i in range(0, 6):
-            self.assertAlmostEqual(p[i], expected[i])
+            assert p[i] == approx(expected[i])
 
     def test14(self):
+
+        @d9.dist
         def missing_roll():
             tables = [0, 0, 0, 0, 0, 0]
             for i in range(4):
@@ -236,7 +246,7 @@ class TestProbLang(unittest.TestCase):
                 tables = tables + one_hot(t - 1, 6)
             return argmin(tables, -1)
 
-        result = d9.run(missing_roll)
+        result = missing_roll()
         expected = [
             0.48225308641975423,
             0.2847222222222224,
@@ -245,8 +255,99 @@ class TestProbLang(unittest.TestCase):
             0.018518518518518517,
         ]
         for i in range(5):
-            self.assertAlmostEqual(result[(i,)], expected[i])
+            assert result[i] == approx(expected[i])
 
+    def test15(self):
 
-if __name__ == "__main__":
-    unittest.main()
+        def g(sides):
+            for j in range(sides):
+                yield sum(*(j for i in range(1)))
+
+        @d9.dist
+        def f(sides):
+            successes = 0
+            for num in g(sides):
+                if 1 >= 2:
+                    successes += num
+            return successes
+
+        pmf = f(6)
+        assert pmf[0] == approx(1)
+
+    def test16(self):
+
+        def g(num_dice, sides):
+            num_sixes = num_dice
+
+            for j in range(1, sides + 1):
+                count = 0
+                loop_count = num_sixes
+                for i in range(num_dice):
+                    if i < loop_count:
+                        if j <= sides:
+                            r = d[j:sides]
+                            if r == j:
+                                count += 1
+                                num_sixes -= 1
+                yield count
+
+        @d9.dist
+        def f(num_dice, sides):
+            return list(g(num_dice, sides))
+
+        @d9.dist
+        def f2(num_dice, sides):
+            return lazy_bincount(num_dice @ d(sides), sides + 1)[1:]
+
+        pmf = f(6, 4)
+        pmf2 = f2(6, 4)
+        for (k, v), (k2, v2) in zip(sorted(pmf.items()), sorted(pmf2.items())):
+            assert k == k2
+            assert v == approx(v2)
+
+    def test_bingo(self):
+
+        @d9.dist(semiring=d9.BigFraction(64))
+        def bingo(cards, num, rounds):
+
+            matches = reduce_sum(cards > 0)
+            result = -1
+            for i in lazy_perm(num, rounds):
+                num = i + 1
+                for j in range(len(cards)):
+                    matches[j] -= num in cards[j]
+                    if matches[j] == 0 and result < 0:
+                        result = j
+
+            return result
+
+        cards = [[5, 6, 7, 8], [1, 2, 3, 0], [1, 2, 4, 0], [1, 3, 4, 0],
+                 [2, 3, 4, 0]]
+
+        pmf = bingo(cards, 8, 6)
+        assert pmf[0] == Fraction(3, 14)
+        for i in range(1, 5):
+            assert pmf[i] == Fraction(11, 56)
+
+        cards = [[1, 2, 4, 5], [1, 2, 3, 7], [1, 3, 5, 6], [1, 4, 6, 7],
+                 [2, 3, 4, 6], [2, 5, 6, 7], [3, 4, 5, 7]]
+
+        pmf = bingo(cards, 7, 5)
+        for i in range(6):
+            assert pmf[i] == Fraction(1, 7)
+
+    def test_hit(self):
+        s = d9.SemiringProduct(d9.BigFraction(64), d9.Real64())
+
+        @d9.dist(semiring=s)
+        def f():
+            total = 0
+            flag = False
+            for i in range(20):
+                total += d(6)
+                flag = flag or total == 10
+            return flag
+
+        pmf = f()
+        assert pmf[True] == (Fraction(17492167,
+                                      60466176), approx(0.2892884610397718))

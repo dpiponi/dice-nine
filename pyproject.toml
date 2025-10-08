@@ -1,4 +1,44 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
 
+[project]
+name = "dice-nine"
+version = "0.9.0"
+description = "Exact probability for RPG dice and combinatorics."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+authors = [{ name = "Dan Piponi" }]
+keywords = ["probability", "dice", "RPG", "combinatorics", "Markov"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+  "numpy>=1.23",
+  "rich>=13",
+]
+
+[project.urls]
+Homepage = "https://github.com/dpiponi/dice-nine"
+Documentation = "https://github.com/dpiponi/dice-nine#readme"
+Changelog = "https://github.com/dpiponi/dice-nine/releases"
+
+# If your package code lives in src/dice9/, keep this so the wheel is built correctly.
+[tool.hatch.build.targets.wheel]
+packages = ["src/dice9"]
+
+# If you ship type hints, add a 'py.typed' file under src/dice9 and include it:
+# [tool.hatch.build]
+# include = ["src/dice9/py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyright]
+typeCheckingMode = "off"
+reportUnusedParameter = "none"
+reportUnusedVariable = "none"

@@ -1,19 +1,16 @@
 # https://rpg.stackexchange.com/questions/212909/help-with-counting-successes-with-multiple-target-numbers
 
+import time
+
 import dice9 as d9
 
-d9.use("np", profile=False)
-import termplotlib as tpl
-
-from dice9.problib import *
-
-
+@d9.dist
 def f():
     pchi = 20
     nchi = 20
 
     for rounds in range(41):
-        p = sum(5 @ (d(6) >= 3)) >= sum(5 @ (d(6) >= 3))
+        p = lazy_sum(5 @ (d(6) >= 3)) >= lazy_sum(5 @ (d(6) >= 3))
         if nchi >= 0 and pchi >= 0:
             if p:
                 pchi = max(move(pchi) - 1, -1)
@@ -26,10 +23,9 @@ def f():
 
 
 
-import time
 
 start = time.perf_counter()
-result = d9.run(f, debug=False)
+result = f()
 end = time.perf_counter()
 print(result)
 
