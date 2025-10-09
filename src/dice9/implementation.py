@@ -1,6 +1,5 @@
 """An interpreter for the probabilistic language dice-nine."""
 
-import numpy as np
 import ast
 import inspect
 import operator
@@ -12,8 +11,10 @@ import functools
 import warnings
 from collections.abc import Iterable
 
+import numpy as np
 
 import dice9.backends.numpy_impl as sx
+from dice9 import problib  # pylint: disable=unused-import
 
 from .factor import (
     Factor,
@@ -30,7 +31,6 @@ from .factor import (
 from .environment import Environment, is_reg
 from .frame import Frame
 from .exceptions import InterpreterError, FoundReturn
-from dice9 import problib  # pylint: disable=unused-import
 from .analysis import move_analysis
 
 from .utils import is_gen_fun, get_signature_from_functiondef, report_error, lift_axis
@@ -52,12 +52,12 @@ def tuple_broadcast(f, node):
 
 def rowwise_indices(a, indices):
     idxs = [np.asarray(ix) for ix in indices]
-    N = a.shape[0]
-    batch = np.arange(N).reshape((N,) + (1,) * (idxs[0].ndim - 1))
+    n = a.shape[0]
+    batch = np.arange(n).reshape((n,) + (1,) * (idxs[0].ndim - 1))
     ref_shape = idxs[0].shape
     if any(ix.shape != ref_shape for ix in idxs):
         raise ValueError("All index arrays must have identical shapes.")
-    if any(ix.shape[0] != N for ix in idxs):
+    if any(ix.shape[0] != n for ix in idxs):
         raise ValueError(
             "Leading dimension of all indices must equal a.shape[0]."
         )
@@ -80,8 +80,8 @@ def updated_rowwise(a, b, *indices):
     if b.shape != ref_shape:
         raise ValueError("b and all index arrays must have identical shapes.")
 
-    N = a.shape[0]
-    if b.shape[0] != N:
+    n = a.shape[0]
+    if b.shape[0] != n:
         raise ValueError(
             "Leading dimension of b and all indices must equal a.shape[0]."
         )
@@ -106,8 +106,8 @@ def updated_aug_rowwise(op, a, b, *indices):
     if b.shape != ref_shape:
         raise ValueError("b and all index arrays must have identical shapes.")
 
-    N = a.shape[0]
-    if b.shape[0] != N:
+    n = a.shape[0]
+    if b.shape[0] != n:
         raise ValueError(
             "Leading dimension of b and all indices must equal a.shape[0]."
         )
@@ -202,7 +202,6 @@ class Interpreter(ast.NodeVisitor):
             "__dumpvars__": self.call_dumpvars,
             "__listvars__": self.call_listvars,
             "__inline_impl__": self.call_inline_impl,
-            # "__inline__": self.call_inline,
             "min": self.call_min,
             "max": self.call_max,
             "sum": self.call_sum,
@@ -233,7 +232,6 @@ class Interpreter(ast.NodeVisitor):
         method = self.visit_dispatch_table[name]
         try:
             return method(node, context)
-        # decorate InterpreterError
         except InterpreterError as exc:
             if not hasattr(exc, "node") and node:
                 exc.node = node
@@ -1283,8 +1281,11 @@ def dist(f=None, **options):
         signature = get_signature_from_functiondef(function_def)
 
         @functools.wraps(f)
-        def wrapped(*args, **kwargs):
-            logging.debug("Starting execution with function `%s`.", f.__name__)
+        def wrapped(*args, _options=None, **kwargs):
+            logging.debug("Starting execution with function `%s(args=%s, kwargs=%s)`.", f.__name__, args, kwargs)
+            nonlocal merged_options
+            if _options:
+                merged_options |= _options
 
             context = {}
             for module in merged_options["modules"]:

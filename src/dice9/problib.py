@@ -7,8 +7,8 @@ import dice9.backends.numpy_impl as sx
 from dice9.exceptions import InterpreterError
 
 
-def is_reg(register):
-    return isinstance(register, d9.Register)
+# def is_reg(register):
+#     return isinstance(register, d9.Register)
 
 
 def reshape_impl(interpreter, context, tensor_register, shape_register):
@@ -17,8 +17,30 @@ def reshape_impl(interpreter, context, tensor_register, shape_register):
     return interpreter.un_op(tensor_register, lambda x: sx.reshape(x, shape))
 
 
-def reshape(tensor, shape):
-    return __inline_impl__(reshape_impl, tensor, shape)
+def reshape(array, shape):
+    r"""Reshapes an array.
+
+Given `array`, this operation returns a new array that has the same
+values as `array` in the same order, except with a new shape given by
+`shape`.
+
+>>>  @d9.dist
+>>>  def main():
+>>>      x = [d(2), d(2), d(2), d(2)]
+>>>      return reshape(x, [2, 2])
+>>>
+>>>  print(main())
+{((1, 1), (2, 2)): np.float64(0.0625), ... }
+
+Args:
+  array: An array.
+  shape: An array.
+    Defines the shape of the output array.
+
+Returns:
+  An `array`. Has the same type as `array`.
+"""
+    return __inline_impl__(reshape_impl, array, shape)
 
 
 def abs_impl(interpreter, context, x_register):

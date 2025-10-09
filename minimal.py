@@ -1,18 +1,27 @@
-import time
+# import time
+# from tabulate import tabulate
 import logging
-import sys
-import matplotlib.pyplot as plt
-
-# sys.tracebacklimit = 8  # Show only the last 2 levels of traceback
-# logging.basicConfig(level=logging.DEBUG)
-
+# import matplotlib.pyplot as plt
+from rich.logging import RichHandler, Console
+# import tabulate
 import dice9 as d9
+# import math
 
-def f():
-    x = [0, 0]
-    for i in range(20):
-        x[d(2) - 1] += 1
-    return x
+if 1:
+    console = Console(force_terminal=True)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(message)s",
+        handlers=[RichHandler(markup=True, show_time=False, console=console)])
 
-pmf = d9.run(f, squeeze=True, show_analysis=True)
-print(pmf)
+if 0:
+    from rich.traceback import install
+    install(show_locals=True)   # show_locals dumps variable values
+
+
+@d9.dist
+def main():
+    x = [d(2), d(2), d(2), d(2)]
+    return reshape(x, [2, 2])
+
+print(main())

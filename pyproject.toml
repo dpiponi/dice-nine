@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dice-nine"
-version = "0.9.0"
+version = "0.9.3"
 description = "Machine precision probabilities for RPG dice and combinatorics without Monte Carlo."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Dan Piponi" }]
 keywords = ["probability", "dice", "RPG", "combinatorics"]
@@ -27,7 +27,6 @@ Homepage = "https://github.com/dpiponi/dice-nine"
 Documentation = "https://github.com/dpiponi/dice-nine#readme"
 Changelog = "https://github.com/dpiponi/dice-nine/releases"
 
-# If your package code lives in src/dice9/, keep this so the wheel is built correctly.
 [tool.hatch.build.targets.wheel]
 packages = ["src/dice9"]
 

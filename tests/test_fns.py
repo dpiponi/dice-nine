@@ -3,6 +3,7 @@
 import pytest
 import math
 import functools
+from fractions import Fraction
 
 import dice9 as d9
 
@@ -1225,3 +1226,17 @@ def test_int2():
     pmf = main()
     assert pmf[0] == pytest.approx(1 / 2)
     assert pmf[-1] == pytest.approx(1 / 2)
+
+def test_options1():
+
+    @d9.dist
+    def f(n=1):
+        return d(n)
+
+    pmf = f(6)
+    assert pmf[1] == pytest.approx(1 / 6)
+    assert pmf[6] == pytest.approx(1 / 6)
+
+    pmf = f(n=4, _options={'semiring': d9.BigFraction(64)})
+    assert pmf[1] == Fraction(1, 4)
+    assert pmf[4] == pytest.approx(1 / 4)
