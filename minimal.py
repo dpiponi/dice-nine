@@ -21,7 +21,6 @@ if 0:
 
 @d9.dist
 def main():
-    x = [d(2), d(2), d(2), d(2)]
-    return reshape(x, [2, 2])
+    return 2 * d(2) - 3
 
 print(main())
