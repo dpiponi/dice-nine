@@ -101,7 +101,7 @@ The Reality
 This is just a toy spare time project and the code will fail in all kinds of ways with various
 inputs. I am still working on catching at least the bad things that could result in incorrect results.
 I've been using the [anydice](https://rpg.stackexchange.com/questions/tagged/anydice) tag on the
-RPG stackexchange as a source of text cases and in every
+RPG stackexchange as a source of test cases and in every
 case either dice-nine agrees with the results there or I disagree with how to interpret the question.
 
 I collected the test cases on [colab](https://colab.research.google.com/drive/1sOh3Ie_uD2RXVKGoFZ3MZwXN-t9_5KCQ?usp=sharing).
