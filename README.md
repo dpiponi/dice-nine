@@ -88,9 +88,7 @@ knowledge about probability theory. There are some small tricks to give it perfo
 
 The combination of these can give some surprisingly good results.
 
-It can also target computation on GPUs via TensorFlow and PyTorch. TensorFlow generally slows
-it down. PyTorch often accelerates it a modest amount. Nonetheless, TensorFlow did inform the
-design more than the other libraries because I started thinking about the idea of writing a DSL
+I started thinking about the idea of writing a DSL
 like this while working at [Google](https://github.com/tensorflow/probability/blob/v0.23.0/tensorflow_probability/python/experimental/marginalize/marginalizable_test.py).
 Compare also with [`tf.vectorized_map`](https://github.com/tensorflow/tensorflow/blob/v2.16.1/tensorflow/python/ops/parallel_for/control_flow_ops.py#L452-L582).
 
@@ -106,4 +104,4 @@ I've been using the [anydice](https://rpg.stackexchange.com/questions/tagged/any
 RPG stackexchange as a source of text cases and in every
 case either dice-nine agrees with the results there or I disagree with how to interpret the question.
 
-I collected the test cases on [colab](https://colab.research.google.com/drive/1sOh3Ie_uD2RXVKGoFZ3MZwXN-t9_5KCQ).
+I collected the test cases on [colab](https://colab.research.google.com/drive/1sOh3Ie_uD2RXVKGoFZ3MZwXN-t9_5KCQ?usp=sharing).
