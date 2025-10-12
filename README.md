@@ -25,14 +25,13 @@ You can simulate entire games within it. Here's a complete D&D (1e) fight:
 
 ```
 def f():
-    hp1 = sum(36 @ d(8))
-    hp2 = sum(18 @ d(8))
+    hp1 = lazy_sum(36 @ d(8))
+    hp2 = lazy_sum(18 @ d(8))
 
     for i in range(14):
         print("round", i)
         if hp1 > 0 and d(20) > 1:
-            hp2 = sum((-x for x in 5 @ d(4)), hp2)
-            hp2 = max(0, hp2)
+            hp2 = max(0, hp2 - lazy_sum((x for x in 5 @ d(4))))
 
         if hp2 > 0: 
             if d(20) > 1:
@@ -40,7 +39,7 @@ def f():
             if d(20) > 1:
                 hp1 -= d(6)
             if d(20) > 1:
-                hp1 = sum((-x for x in 5 @ d(8)), hp1)
+                hp1 -= lazy_sum((x for x in 5 @ d(8)))
             hp1 = max(hp1, 0)
 
     win1 = hp2 == 0
@@ -55,15 +54,21 @@ you can roll 24 dice.
 
 ```
 def f(a, d):
+  # Roll `a` attack dice counting the number
+  # of each type.
   actions = lazy_bincount(a @ d(6), 7)
 
+  # Roll `d` defense dice removing any matches from
+  # from the attack dice.
   for i in d @ d(6):
     actions[i] = max(actions[i] - 1, 0)
 
+  # Find the largest of the uneliminated dice.
   if reduce_all(actions == 0):
     result = 0
   else:
     result = last(actions > 0)
+  # And count any sixes beyond the first.
   boons = max(actions[6] - 1, 0)
   return (result, boons)
 ```
@@ -100,3 +105,5 @@ inputs. I am still working on catching at least the bad things that could result
 I've been using the [anydice](https://rpg.stackexchange.com/questions/tagged/anydice) tag on the
 RPG stackexchange as a source of text cases and in every
 case either dice-nine agrees with the results there or I disagree with how to interpret the question.
+
+I collected the test cases on [colab](https://colab.research.google.com/drive/1sOh3Ie_uD2RXVKGoFZ3MZwXN-t9_5KCQ).

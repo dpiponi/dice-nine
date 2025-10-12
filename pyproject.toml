@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dice-nine"
-version = "0.9.3"
+version = "0.9.4"
 description = "Machine precision probabilities for RPG dice and combinatorics without Monte Carlo."
 readme = "README.md"
 requires-python = ">=3.12"

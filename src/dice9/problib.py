@@ -7,10 +7,6 @@ import dice9.backends.numpy_impl as sx
 from dice9.exceptions import InterpreterError
 
 
-# def is_reg(register):
-#     return isinstance(register, d9.Register)
-
-
 def reshape_impl(interpreter, context, tensor_register, shape_register):
     value = interpreter.move_definite_value(shape_register)
     shape = (-1,) + sx.convert_to_tuple(value)
@@ -85,6 +81,37 @@ def arange_impl(interpreter, context, start_register, limit_register, delta_regi
 
 
 def arange(start, limit, delta):
+    """Creates an arithmetic sequence of numbers.
+
+    Creates a sequence starting at `start`, stepping by
+    `delta`, up to but not including `limit`.
+
+    Like Python `range`, `start` defaults to 0, so that
+    `range(n) = range(0, n)`.
+
+    The arguments are required to be deterministic.
+
+    For example:
+
+    >>> @d9.dist
+    >>> def main():
+    >>>     return d(2) + range(3)
+    >>> print(main())
+    {(2, 3, 4): np.float64(0.5), (1, 2, 3): np.float64(0.5)}
+
+    >>> @d9.dist
+    >>> def main():
+    >>>     return range(d(6))
+    ValueError
+
+    Args:
+      start: A deterministic lower limit.
+      limit: A deterministic upper limit.
+      delta: A deterministic increment.
+
+    Returns:
+      An 1-D `array`.
+    """
     return __inline_impl__(arange_impl, start, limit, delta)
 
 
@@ -114,7 +141,7 @@ def impl_axis_maker(op):
     return impl
 
 
-# Flip needs to work with bools too.
+# @todo Flip needs to work with bools too.
 flip_impl = impl_axis_maker(lambda x, axis: sx.flip(x, axis=axis))
 
 argsort_impl = impl_axis_maker(lambda x, axis: sx.argsort(x, axis=axis))
