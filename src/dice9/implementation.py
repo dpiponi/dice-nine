@@ -7,6 +7,7 @@ import logging
 import dataclasses
 import textwrap
 import types
+from typing import cast
 import functools
 import warnings
 from collections.abc import Iterable
@@ -213,14 +214,14 @@ class Interpreter(ast.NodeVisitor):
             "importance": self.call_importance,
         }
 
-    def run(self, node, context):
+    def run(self, node, context: Context):
         self.visit_with(node, context)
 
     def set_debug_loc(self, node, frame):
         self.node = node
         self.frame = frame
 
-    def visit_with(self, node, context):
+    def visit_with(self, node, context: Context):
         self.set_debug_loc(node, context.frame)
         name = node.__class__.__name__
         if name not in self.visit_dispatch_table:
@@ -238,7 +239,7 @@ class Interpreter(ast.NodeVisitor):
                 exc.frame = context.frame
             raise exc
 
-    def visit_generator_function(self, node, context):
+    def visit_generator_function(self, node, context: Context):
         try:
             visitor = self.visit_as_generator_dispatch_table[node.__class__.__name__]
             yield from visitor(node, context)
@@ -246,7 +247,7 @@ class Interpreter(ast.NodeVisitor):
             logging.debug("Cleaning up generator function.")
             context.frame.delete_all(self.env)
 
-    def visit_as_generator(self, node, context):
+    def visit_as_generator(self, node, context: Context):
         try:
             self.node = node
             result = self.visit_as_generator_dispatch_table[node.__class__.__name__](
@@ -263,18 +264,18 @@ class Interpreter(ast.NodeVisitor):
                 frame=context.frame,
             ) from e
 
-    def visit_as_generator_generic(self, node, context):
+    def visit_as_generator_generic(self, node, context: Context):
         for child in ast.iter_child_nodes(node):
             yield from self.visit_as_generator(child, context)
 
-    def visit_generic(self, node, context):
+    def visit_generic(self, node, context: Context):
         for child in ast.iter_child_nodes(node):
             self.visit_with(child, context)
 
     # This is necessary or else the default args will
     # be evaluated and left orphaned.
     # XXX do same for generators
-    def visit_function_def(self, node, context):
+    def visit_function_def(self, node, context: Context):
         self.visit_statements(node.body, context)
 
     visit_arg_with_contextuments = visit_generic
@@ -284,12 +285,12 @@ class Interpreter(ast.NodeVisitor):
     visit_as_generator_arguments = visit_as_generator_generic
     visit_as_generator_arg = visit_as_generator_generic
 
-    def visit_yield(self, node, context):
+    def visit_yield(self, node, context: Context):
         raise InterpreterError(
             "Can't yield from top level function.", node=node, frame=context.frame
         )
 
-    def visit_as_generator_yield(self, node, context):
+    def visit_as_generator_yield(self, node, context: Context):
         logging.debug("Yielding... %s", node.value)
         if context.frame.conditional_depth > 0:
             raise InterpreterError(
@@ -303,13 +304,13 @@ class Interpreter(ast.NodeVisitor):
         logging.debug("Yielding %s.", value)
         yield value
 
-    def visit_as_generator_yieldfrom(self, node, context):
+    def visit_as_generator_yieldfrom(self, node, context: Context):
         yield from self.visit_with(node.value, context)
 
-    def visit_as_generator_expr(self, node, context):
+    def visit_as_generator_expr(self, node, context: Context):
         return self.visit_as_generator(node.value, context)
 
-    def visit_list_comp(self, node, context):
+    def visit_list_comp(self, node, context: Context):
         expr = node.elt
         element_name = node.generators[0].target
         domain = node.generators[0].iter
@@ -317,7 +318,7 @@ class Interpreter(ast.NodeVisitor):
         elts = list(self.comprehension(expr, element_name, domain, context))
         return self.lift(lambda *z: sx.stack(z, 1))(*elts)
 
-    def comprehension(self, expr, var_expr, iterator_expr, context):
+    def comprehension(self, expr, var_expr, iterator_expr, context: Context):
         iter_values = self.visit_with(iterator_expr, context)
         name = var_expr.id
 
@@ -337,11 +338,11 @@ class Interpreter(ast.NodeVisitor):
         if context.frame.has_var(name):
             context.frame.delete_var_and_register(self.env, name)
 
-    def visit_as_generator_for(self, node, context):
+    def visit_as_generator_for(self, node, context: Context):
         for _ in self.for_generator(node, context):
             yield from self.visit_as_generator_statements(node.body, context)
 
-    def visit_list(self, node, context):
+    def visit_list(self, node, context: Context):
         if not node.elts:
             return context.frame.allocate_register_with_definite_value(
                 self.env, sx.zeros((0,), dtype=sx.int64)
@@ -358,12 +359,12 @@ class Interpreter(ast.NodeVisitor):
 
         return self.lift(lambda *x: sx.concat(x, 1))(*element_registers)
 
-    def visit_pass(self, _node, _context):
+    def visit_pass(self, _node, _context: Context):
         # These dels are to shut up pyright.
         del _node, _context
         return
 
-    def visit_return(self, node, context):
+    def visit_return(self, node, context: Context):
         if context.frame.conditional_depth > 0:
             raise InterpreterError(
                 "Can't return from a branch of a conditional",
@@ -379,7 +380,7 @@ class Interpreter(ast.NodeVisitor):
         context.frame.delete_all(self.env)
         raise FoundReturn(registers)
 
-    def report_line(self, context, stmt):
+    def report_line(self, context: Context, stmt):
         start = stmt.lineno
         end = getattr(stmt, "end_lineno", start)
         lines = context.frame.source.splitlines()
@@ -391,30 +392,30 @@ class Interpreter(ast.NodeVisitor):
             textwrap.dedent(message),
         )
 
-    def visit_statements(self, node, context):
+    def visit_statements(self, node, context: Context):
         for stmt in node:
             if LOGGER.isEnabledFor(logging.DEBUG) and hasattr(stmt, "lineno"):
                 self.report_line(context, stmt)
             self.visit_with(stmt, context)
 
-    def visit_as_generator_statements(self, node, context):
+    def visit_as_generator_statements(self, node, context: Context):
         for stmt in node:
             logging.debug("Executing: %s.", ast.unparse(stmt))
             yield from self.visit_as_generator(stmt, context)
 
-    def visit_module(self, node, context):
+    def visit_module(self, node, context: Context):
         self.visit_statements(node.body, context)
 
-    def visit_expr(self, node, context):
+    def visit_expr(self, node, context: Context):
         return self.visit_with(node.value, context)
 
-    def visit_generator_exp(self, node, context):
+    def visit_generator_exp(self, node, context: Context):
         element_name = node.generators[0].target
         domain = node.generators[0].iter
 
         return self.comprehension(node.elt, element_name, domain, context)
 
-    def for_generator(self, node, context):
+    def for_generator(self, node, context: Context):
         logging.debug("For")
 
         iterable = self.visit_with(node.iter, context)
@@ -441,7 +442,8 @@ class Interpreter(ast.NodeVisitor):
 
             case Iterable():  # types.GeneratorType() | zip() | list():
                 names = (
-                    tuple(target.id for target in node.target.elts)
+                    # Assuming we have simple `for <name1>, ... = ...`
+                    tuple(cast(ast.Name, target).id for target in node.target.elts)
                     if isinstance(node.target, ast.Tuple)
                     else (node.target.id,)
                 )
@@ -466,7 +468,7 @@ class Interpreter(ast.NodeVisitor):
                     node=node.iter,
                 )
 
-    def visit_for(self, node, context):
+    def visit_for(self, node, context: Context):
         for _ in self.for_generator(node, context):
             self.visit_statements(node.body, context)
 
@@ -499,7 +501,7 @@ class Interpreter(ast.NodeVisitor):
 
         context.frame.bind(array_name, result)
 
-    def visit_assign(self, node, context):
+    def visit_assign(self, node, context: Context):
         if len(node.targets) != 1:
             raise TypeError("Only single assignments supported.")
 
@@ -531,7 +533,7 @@ class Interpreter(ast.NodeVisitor):
             case _:
                 raise NotImplementedError("Only simple assignments supported.")
 
-    def visit_aug_assign(self, node, context):
+    def visit_aug_assign(self, node, context: Context):
         rhs = self.visit_with(node.value, context)
 
         op_map = {
@@ -573,30 +575,30 @@ class Interpreter(ast.NodeVisitor):
             case _:
                 raise NotImplementedError("Unsupported augmented assignment target")
 
-    def lift_as_gen(self, fn, node, context):
+    def lift_as_gen(self, fn, node, context: Context):
         fn(node, context)
         yield from ()
 
-    def visit_as_generator_augassign(self, node, context):
+    def visit_as_generator_augassign(self, node, context: Context):
         yield from self.lift_as_gen(self.visit_aug_assign, node, context)
 
-    def visit_as_generator_assign(self, node, context):
+    def visit_as_generator_assign(self, node, context: Context):
         yield from self.lift_as_gen(self.visit_with, node, context)
 
-    def visit_as_generator_delete(self, node, context):
+    def visit_as_generator_delete(self, node, context: Context):
         yield from self.lift_as_gen(self.visit_delete, node, context)
 
-    def visit_as_generator_if(self, node, context):
+    def visit_as_generator_if(self, node, context: Context):
         yield from self.lift_as_gen(self.visit_if, node, context)
 
-    def visit_simple_assign(self, context, var_name, value):
+    def visit_simple_assign(self, context: Context, var_name, value):
         context.frame.assign(self.env, var_name, value, clobber=True)
 
-    def visit_assign_tuple(self, context, elts, values):
+    def visit_assign_tuple(self, context: Context, elts, values):
         for value, var in zip(values, elts):
             self.visit_simple_assign(context, var.id, value)
 
-    def visit_name(self, node, context):
+    def visit_name(self, node, context: Context):
         if isinstance(node.ctx, ast.Load):
             var_name = node.id
 
@@ -618,7 +620,7 @@ class Interpreter(ast.NodeVisitor):
 
         raise NotImplementedError("???")
 
-    def visit_constant(self, node, _context):
+    def visit_constant(self, node, _context: Context):
         del _context
         return node.value
 
@@ -666,7 +668,7 @@ class Interpreter(ast.NodeVisitor):
 
         return lifted_op
 
-    def visit_if_exp(self, node, context):
+    def visit_if_exp(self, node, context: Context):
         test = self.visit_with(node.test, context)
         body = self.visit_with(node.body, context)
         orelse = self.visit_with(node.orelse, context)
@@ -687,11 +689,11 @@ class Interpreter(ast.NodeVisitor):
     }
 
     # XXX Need to define local Frame
-    def matmult(self, n, gen, context):
+    def matmult(self, n, gen, context: Context):
         for _ in range(n):
             yield self.visit_with(gen, context)
 
-    def visit_set(self, node, context):
+    def visit_set(self, node, context: Context):
         for element in node.elts:
             if isinstance(element, ast.Starred):
                 yield from self.visit_with(element.value, context)
@@ -727,7 +729,7 @@ class Interpreter(ast.NodeVisitor):
                 frame=self.frame,
             )
 
-    def visit_bin_op(self, node, context):
+    def visit_bin_op(self, node, context: Context):
         self.set_debug_loc(node, context.frame)
         logging.debug("Evaluating binary operator `%s`.", type(node.op).__name__)
 
@@ -770,7 +772,7 @@ class Interpreter(ast.NodeVisitor):
         ast.NotIn: sx.isnotin,
     }
 
-    def visit_compare(self, node, context):
+    def visit_compare(self, node, context: Context):
         if not node.ops:
             return self.visit_with(node.left, context)
 
@@ -817,7 +819,7 @@ class Interpreter(ast.NodeVisitor):
 
         return result
 
-    def visit_bool_op(self, node, context):
+    def visit_bool_op(self, node, context: Context):
         values = [self.visit_with(v, context) for v in node.values]
 
         op_map = {ast.And: sx.logical_and, ast.Or: sx.logical_or}
@@ -831,7 +833,7 @@ class Interpreter(ast.NodeVisitor):
         except KeyError as exc:
             raise NotImplementedError(f"Unsupported bool op {type(node.op)}") from exc
 
-    def visit_unary_op(self, node, context):
+    def visit_unary_op(self, node, context: Context):
         operand = self.visit_with(node.operand, context)
 
         op_map = {
@@ -848,7 +850,7 @@ class Interpreter(ast.NodeVisitor):
 
         return self.un_op(operand, op)
 
-    def visit_assert(self, node, context):
+    def visit_assert(self, node, context: Context):
         condition_register = self.visit_with(node.test, context)
 
         frame, env = context.frame.semi_split(self.env, condition_register)
@@ -856,7 +858,7 @@ class Interpreter(ast.NodeVisitor):
         context.frame = frame
         self.env = env
 
-    def visit_if(self, node, context):
+    def visit_if(self, node, context: Context):
 
         condition = self.visit_with(node.test, context)
 
@@ -898,7 +900,7 @@ class Interpreter(ast.NodeVisitor):
 
         self.env = env
 
-    def builtin_multiroll(self, ranges_reg, _context, mode="prob"):
+    def builtin_multiroll(self, ranges_reg, _context: Context, mode="prob"):
         del _context
         fi = self.env.find_factor_index(ranges_reg)
         factor = self.env.factors[fi]
@@ -917,11 +919,11 @@ class Interpreter(ast.NodeVisitor):
 
         return roll_reg
 
-    def builtin_dd(self, node, context):
+    def builtin_dd(self, node, context: Context):
         sides_register = self.visit_with(node.args[0], context)
         return self.env.dd(sides_register)
 
-    def call__reduce__(self, node, context, op):
+    def call__reduce__(self, node, context: Context, op):
         reg = self.visit_with(node.args[0], context)
         if is_reg(reg):
             values = self.env[reg]
@@ -930,20 +932,20 @@ class Interpreter(ast.NodeVisitor):
 
         return reg
 
-    def call__max__(self, node, context):
+    def call__max__(self, node, context: Context):
         return self.call__reduce__(node, context, sx.reduce_max)
 
-    def call__min__(self, node, context):
+    def call__min__(self, node, context: Context):
         return self.call__reduce__(node, context, sx.reduce_min)
 
-    def call__all__(self, node, context):
+    def call__all__(self, node, context: Context):
         return self.call__reduce__(node, context, sx.reduce_all)
 
-    def call__any__(self, node, context):
+    def call__any__(self, node, context: Context):
         return self.call__reduce__(node, context, sx.reduce_any)
 
     # Special because multiple args which themselves can be *arg.
-    def call_extremum(self, node, context, op, identity=None):
+    def call_extremum(self, node, context: Context, op, identity=None):
         self.set_debug_loc(node, context.frame)
         result = identity
 
@@ -958,21 +960,21 @@ class Interpreter(ast.NodeVisitor):
 
         return result
 
-    def call_min(self, node, context):
+    def call_min(self, node, context: Context):
         return self.call_extremum(node, context, sx.minimum)
 
-    def call_max(self, node, context):
+    def call_max(self, node, context: Context):
         return self.call_extremum(node, context, sx.maximum)
 
-    def call_sum(self, node, context):
+    def call_sum(self, node, context: Context):
         return self.call_extremum(node, context, operator.add, identity=0)
 
-    def call_zip(self, node, context):
+    def call_zip(self, node, context: Context):
         gen1 = self.visit_with(node.args[0], context)
         gen2 = self.visit_with(node.args[1], context)
         return zip(gen1, gen2)
 
-    def call_move(self, node, context):
+    def call_move(self, node, context: Context):
         var_name = node.args[0].id
         result = context.frame.move(var_name)
         logging.debug("Moving var `%s` of value %s.", var_name, result)
@@ -986,7 +988,7 @@ class Interpreter(ast.NodeVisitor):
             )
         return result
 
-    def call_d(self, node, context):
+    def call_d(self, node, context: Context):
         # Check len()
         sides_register = self.visit_with(node.args[0], context)
 
@@ -1010,7 +1012,7 @@ class Interpreter(ast.NodeVisitor):
     # This is a little quirky. The `self.promote` is needed to_py_scalar
     # create a factor, any factor that the importance can be applied
     # to.
-    def call_importance(self, node, context):
+    def call_importance(self, node, context: Context):
         # Check len()
         sides_register = self.promote(self.visit_with(node.args[0], context))
         fi = self.env.find_factor_index(sides_register)
@@ -1018,15 +1020,15 @@ class Interpreter(ast.NodeVisitor):
         factor.p = factor.p * factor[sides_register]
         return
 
-    def call_dumpvars(self, _node, context):
+    def call_dumpvars(self, _node, context: Context):
         del _node
         context.frame.show(self.env)
 
-    def call_listvars(self, _node, _context):
+    def call_listvars(self, _node, _context: Context):
         del _node, _context
         self.env.listvars()
 
-    def call_inline_impl(self, node, context):
+    def call_inline_impl(self, node, context: Context):
         impl_name = node.args[0].id
         args = [self.visit_with(arg, context) for arg in node.args[1:]]
         return self.globals[impl_name](self, context, *args)
@@ -1035,7 +1037,7 @@ class Interpreter(ast.NodeVisitor):
     #     impl_name = node.args[0].id
     #     return self.globals[impl_name](self, context, *node.args[1:])
 
-    def visit_call(self, node, context):
+    def visit_call(self, node, context: Context):
         try:
             func_name = node.func.id  # we assume it's a simple name, not obj.method
         except Exception:
@@ -1131,7 +1133,7 @@ class Interpreter(ast.NodeVisitor):
             node=node.func,
         )
 
-    def visit_delete(self, node, context):
+    def visit_delete(self, node, context: Context):
         for target in node.targets:
             match target:
                 case ast.Name(id=var_name):
@@ -1151,7 +1153,7 @@ class Interpreter(ast.NodeVisitor):
                         node=node,
                     )
 
-    def multiroll_d(self, range_expr, context, mode="prob"):
+    def multiroll_d(self, range_expr, context: Context, mode="prob"):
 
         def one_range(slice_expr):
             match slice_expr:
@@ -1178,7 +1180,7 @@ class Interpreter(ast.NodeVisitor):
                 s = self.lift(lambda x: sx.stack([x], 1))(s)
                 return self.builtin_multiroll(s, context, mode)
 
-    def visit_subscript(self, node, context):
+    def visit_subscript(self, node, context: Context):
         # Special case of d[...]
         if isinstance(node.value, ast.Name) and node.value.id == "d":
             return self.multiroll_d(node.slice, context)

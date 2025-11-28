@@ -38,9 +38,8 @@ prime_table = [
 class Semiring(ABC):
     """Operations on the probability axis."""
 
-    dtype : None| type = None
+    dtype : type
     
-
     @abstractmethod
     def ones(self, shape: Sequence[int]):
         ...
@@ -109,7 +108,7 @@ class PartialField(Semiring):
 
 
 class BaseField(PartialField):
-    dtype : None| type = None
+    dtype : type
 
     def ones(self, shape):
         return sx.ones(shape, dtype=self.dtype)

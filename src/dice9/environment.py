@@ -1,15 +1,16 @@
 from functools import reduce
 import logging
 import operator
+from typing import Any, Dict
 
 import dice9.backends.numpy_impl as sx
-
+from .algebra import Semiring, PartialField
 from .factor import Factor, is_reg, Register
 
 
 class Environment:
 
-    def __init__(self, semiring, factors):
+    def __init__(self, semiring : Semiring, factors):
         self.semiring = semiring
         self.factors = factors
         logging.debug("Created Env(%s).", id(self))
@@ -20,7 +21,6 @@ class Environment:
     def show(self, names={}):
         from rich.columns import Columns
         from rich.console import Console
-#        from rich.table import Table
         from rich.panel import Panel
 
         console = Console()
@@ -35,7 +35,19 @@ class Environment:
         return (value if is_reg(value) else
                 self.allocate_register_with_definite_value(value))
 
-    def allocate_register_with_definite_value(self, value):
+    def allocate_register_with_definite_value(self, value) -> Register:
+        """
+        Create a new register from specified value. It is created
+        in a new factor so it becomes a new "independent" variable
+        with probability 1.
+
+        Args:
+            value: the value of the new register.
+
+        Returns:
+            The new register.
+        """
+
         new_register = Register.new()
         p = self.semiring.ones((1,))
         converted = sx.convert_to_tensor(value)
@@ -46,16 +58,27 @@ class Environment:
                       new_register, id(self), value)
         return new_register
 
-    def allocate_factor_with_register_with_probability(self, p, value):
+    def allocate_factor_with_register_with_probability(self, p, value) -> Register:
         new_register = Register.new()
         factor = Factor(self.semiring, p, {new_register: value})
         self.add_factor(factor)
         return new_register
 
-    def add_factor(self, factor):
+    def add_factor(self, factor: Factor):
         self.factors.append(factor)
 
-    def __contains__(self, register):
+    def __contains__(self, register: Register) -> bool:
+        """
+        Checks whether any factor in the environment contains the given
+        register.
+
+        Args:
+            register: the register to check for.
+
+        Returns:
+            True or False depending on whether register is present.
+        """
+
         return any(register in factor for factor in self.factors)
 
     def find_factor(self, register):
@@ -71,7 +94,7 @@ class Environment:
                 return i
         raise ValueError(f"Register {register} not found in environment")
 
-    def duplicate_register(self, register):
+    def duplicate_register(self, register: Register) -> Register:
         new_register = Register.new()
         factor = self.find_factor(register)
         factor[new_register] = factor[register]
@@ -136,7 +159,7 @@ class Environment:
                 for key, value in factor._values.items()]
                for factor in self.factors])
 
-    def distribution(self, vars, normalize=False):
+    def distribution(self, vars, normalize=False) -> Dict:
         s = self.semiring
 
         vars_was_tuple = isinstance(vars, tuple)
@@ -153,6 +176,7 @@ class Environment:
         pdf = {}
         probs = factor.p
         if normalize:
+            assert isinstance(s, PartialField)
             total_prob = s.add_reduce(probs)
             probs = s.divide(probs, total_prob)
         for i in range(s.len(probs)):
@@ -164,7 +188,7 @@ class Environment:
 
         return pdf
 
-    def common_factor(self, registers):
+    def common_factor(self, registers: list[Register]) -> Factor:
         shared_factors = []
         unshared_factors = []
 
@@ -179,7 +203,7 @@ class Environment:
 
         return shared_factor
 
-    def move_definite_register(self, register):
+    def move_definite_register(self, register: Register):
         factor = self.find_factor(register)
         values = factor[register]
         if len(values) == 1:
@@ -197,7 +221,7 @@ class Environment:
 
         raise ValueError(f"Value {values} is not definite.")
 
-    def move_register(self, register):
+    def move_register(self, register: Register) -> Any:
         factor = self.find_factor(register)
         values = factor[register]
         self.__delitem__(register)
