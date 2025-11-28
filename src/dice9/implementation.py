@@ -1037,8 +1037,9 @@ class Interpreter(ast.NodeVisitor):
     #     impl_name = node.args[0].id
     #     return self.globals[impl_name](self, context, *node.args[1:])
 
-    def visit_call(self, node, context: Context):
+    def visit_call(self, node: ast.Call, context: Context):
         try:
+            assert isinstance(node.func, ast.Name)
             func_name = node.func.id  # we assume it's a simple name, not obj.method
         except Exception:
             raise InterpreterError("You called a function that is not a function.")
