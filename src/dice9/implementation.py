@@ -176,8 +176,8 @@ class Interpreter(ast.NodeVisitor):
             "Delete": self.visit_delete,
             "Subscript": self.visit_subscript,
             "Set": self.visit_set,
-            "arguments": self.visit_arguments,
-            "arg": self.visit_arg,
+            "arguments": self.visit_arg_with_contextuments,
+            "arg": self.visit_arg_with_context,
         }
 
         self.visit_as_generator_dispatch_table = {
@@ -277,8 +277,8 @@ class Interpreter(ast.NodeVisitor):
     def visit_function_def(self, node, context):
         self.visit_statements(node.body, context)
 
-    visit_arguments = visit_generic
-    visit_arg = visit_generic
+    visit_arg_with_contextuments = visit_generic
+    visit_arg_with_context = visit_generic
     visit_as_generator_module = visit_as_generator_generic
     visit_as_generator_functiondef = visit_as_generator_generic
     visit_as_generator_arguments = visit_as_generator_generic
@@ -559,7 +559,9 @@ class Interpreter(ast.NodeVisitor):
                 context.frame.bind(var_name, result)
 
             case ast.Subscript(value=ast.Name(id=var_name), slice=index_node):
-                rowwise_fn = lambda o, v, *i: updated_aug_rowwise(op_fn, o, v, *i)
+                def rowwise_fn(o, v, *i):
+                    return updated_aug_rowwise(op_fn, o, v, *i)
+
                 self._handle_subscript_assignment(
                     context,
                     var_name,
@@ -718,7 +720,7 @@ class Interpreter(ast.NodeVisitor):
             )
         try:
             return self.env.promote(value)
-        except:
+        except Exception:
             raise InterpreterError(
                 "Can't convert expression to numeric dice-nine type.",
                 node=self.node,
@@ -735,7 +737,7 @@ class Interpreter(ast.NodeVisitor):
         if op_type == ast.MatMult:
             try:
                 n = self.move_definite_value(left)
-            except ValueError as exc:
+            except ValueError:
                 raise InterpreterError(
                     "The `@` operator needs a definite value for its first argument.",
                     node=node.left,
@@ -752,7 +754,7 @@ class Interpreter(ast.NodeVisitor):
 
         try:
             return self.bin_op(left, right, op_func)
-        except TypeError as exc:
+        except TypeError:
             raise InterpreterError(
                 "Can't evaluate binary operator.", node=node.op, frame=context.frame
             )
@@ -1036,7 +1038,7 @@ class Interpreter(ast.NodeVisitor):
     def visit_call(self, node, context):
         try:
             func_name = node.func.id  # we assume it's a simple name, not obj.method
-        except:
+        except Exception:
             raise InterpreterError("You called a function that is not a function.")
         logging.debug("Call to function with name `%s`.", func_name)
 
@@ -1278,6 +1280,7 @@ def dist(f=None, **options):
         parsed = ast.parse(source)
 
         function_def = parsed.body[0]
+        assert isinstance(function_def, ast.FunctionDef)
         signature = get_signature_from_functiondef(function_def)
 
         @functools.wraps(f)
@@ -1288,8 +1291,9 @@ def dist(f=None, **options):
                 merged_options |= _options
 
             context = {}
-            for module in merged_options["modules"]:
-                context.update(module.__dict__)
+            if merged_options:
+                for module in merged_options["modules"]:
+                    context.update(module.__dict__)
             context.update(f.__globals__)
 
             seen = set()

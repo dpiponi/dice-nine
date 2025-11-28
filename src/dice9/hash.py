@@ -35,7 +35,7 @@ def _hash_tensor(tensor, prime=7371967656361):
     tensor64 = sx.cast(tensor, sx.int64)
     acc = sx.reduce_sum(tensor64 * weights, axis=1)
     if sx.check_hash_collision(tensor64, acc):
-        raise "not inj"
+        raise ValueError("Not an injection")
     return acc
 
 def hash_tensors(tensors: sx.Tensor, prime=73716967656361):

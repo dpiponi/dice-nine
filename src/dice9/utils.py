@@ -1,6 +1,5 @@
 import ast
 import inspect
-from .exceptions import InterpreterError, FoundReturn
 import logging
 from rich.console import Console
 from rich.panel import Panel

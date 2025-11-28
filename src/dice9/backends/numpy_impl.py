@@ -1,5 +1,6 @@
 import builtins
 import numpy as np
+import operator
 
 # =============================================================================
 # Scalar / Python interop
@@ -123,7 +124,6 @@ def gather(tensor, index):
 # Scatter updates (row-wise)
 # =============================================================================
 
-import operator
 
 
 def scatter_update_op(x, slices, updates, op=operator.setitem):
@@ -342,7 +342,7 @@ def dd_helper(nv):
 # =============================================================================
 
 
-def check_hash_collision(keys: np.ndarray, hashes: np.ndarray) -> bool:
+def check_hash_collision(keys: np.ndarray, hashes: np.ndarray) -> builtins.bool:
     """
     Check for collisions where hashes match but keys differ (row-wise equality).
     Prints the first such collision for debugging; returns True if any found.
@@ -415,7 +415,6 @@ def inv_tables(primes):
 
     return inv
 
-import numpy as np
 
 def logsumexp(x, axis=None, keepdims=False):
     """
@@ -464,7 +463,8 @@ argmax = np.argmax
 argsort = np.argsort
 arange = np.arange
 broadcast_to = np.broadcast_to
-cast = lambda x, t, *args, **kwargs: np.asarray(x).astype(t)
+def cast(x, t, *args, **kwards):
+    return np.array(x).astype(t)
 complex128 = np.complex128
 concat = np.concatenate
 constant = np.array
@@ -502,7 +502,8 @@ pad = np.pad
 pow = np.power
 range_ = np.arange  # 'range' shadowing is often undesirable; keep both if needed
 range = np.arange
-rank = lambda x, *args, **kwargs: len(np.asarray(x).shape)
+def rank(x, *args, **kwargs):
+    return len(np.asarray(x).shape)
 real = np.real
 reduce_all = np.all
 reduce_any = np.any
@@ -530,9 +531,15 @@ where = np.where
 zeros = np.zeros
 ones = np.ones
 convert_to_tensor = np.asarray
-to_list = lambda x: x.tolist()
+
+def to_list(x):
+    return x.tolist()
+
 isin = np.isin
-isnotin = lambda a, b: np.isin(a, b, invert=True)
+
+def isnotin(a, b):
+    return np.isin(a, b, invert=True)
+
 convert_to_tuple = numpy_to_tuple
 bincount = rowwise_bincount
 flip = np.flip
