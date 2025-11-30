@@ -1,10 +1,12 @@
 # import time
 # from tabulate import tabulate
 import logging
+import numpy as np
 # import matplotlib.pyplot as plt
 from rich.logging import RichHandler, Console
 # import tabulate
 import dice9 as d9
+import dice9.factor
 # import math
 
 if 0:
@@ -18,30 +20,28 @@ if 0:
     from rich.traceback import install
     install(show_locals=True)   # show_locals dumps variable values
 
+p = np.array([0.1, 0.2, 0.3])
+i = np.array([10, 10, 1])
+j = np.array([0, 0, 2])
+l = np.array([5, 7, 9])
+
+print("i = ", i)
+print("j = ", j)
+print("l = ", l)
+
+idx, p_sum = d9.factor.dedupe_and_aggregate([i, j], p, d9.factor.hash_tensors, d9.Real64())
+
+print(f"idx = {idx}, p_sum = {p_sum})")
+
+e = d9.factor.expectation(l, [i, j], p, d9.factor.hash_tensors, d9.Real64())
+
+print(f"result = {e}")
 
 @d9.dist
-def f():
-    hp1 = lazy_sum(36 @ d(8))
-    hp2 = lazy_sum(18 @ d(8))
+def main():
+    x = d(6)
+    y = 0 * x
+    return E(x, y)
 
-    for i in range(14):
-        print("round", i)
-        if hp1 > 0 and d(20) > 1:
-            for x in 5 @ d(4):
-                hp2 = max(0, hp2 - x)
-
-        if hp2 > 0: 
-            if d(20) > 1:
-                hp1 -= d(6)
-            if d(20) > 1:
-                hp1 -= d(6)
-            if d(20) > 1:
-                for x in 5 @ d(8):
-                    hp1 = max(0, hp1 - x)
-
-    win1 = hp2 == 0
-    win2 = hp1 == 0
-
-    return win1, win2
-
-print(f())
+pmf = main()
+print(pmf)

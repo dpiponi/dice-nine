@@ -68,6 +68,32 @@ def expand_to(tensor, axis, n):
 
 
 def dedupe_and_aggregate(tensors, p, hash_fn, semiring: Semiring):
+    """
+    Considering a `Factor` to be a table with `row[i]` consisting
+    of each of
+
+      `tensors[0][i]`, `tensors[1][i]`, ...
+
+    and with an associated value `p[i]`.
+
+    this function find a representative of class of duplicated row
+
+       `tensor[0][first_pos[j]]`, `tensor[1][first_pos[j]]`, ...
+
+    and where the associated value `p_summed[j]` is the sum of all
+    `p[i]` with the same duplicated row.
+
+    Args:
+        tensors: a sequence of tensors to be deduplicated.
+        p: the values associated to each row.
+        hash_fn: the hash function used to detect duplicate rows.
+        semiring: the semiring in which the addition of `p` values occurs.
+
+    Returns:
+        A pair `(first_pos, p_summed)` where `first_pos` is an array of indices
+        picking out a unique representative of each class of equivalent row and
+        `p_summed` is the sum of `p` values for each class.
+    """
     tensors = list(t for t in tensors if len(t) > 0)
 
     if len(tensors) == 0:
@@ -91,11 +117,105 @@ def dedupe_and_aggregate(tensors, p, hash_fn, semiring: Semiring):
 
     return first_pos, p_summed
 
+# def expectation(tensor, conditions, p, hash_fn, semiring: Semiring):
+#     conditions = list(t for t in conditions if len(t) > 0)
+
+#     if len(conditions) == 0:
+#         return [], p
+
+#     num_rows = semiring.len(p)
+#     if num_rows == 1:
+#         return [0], p
+
+#     logging.debug("Marginalizing %s conditions in %s worlds.", len(conditions), semiring.len(p))
+
+#     hashes = hash_fn(conditions)
+#     unique_hashes, inv_idx = sx.unique(hashes)
+#     print(f"inv_idx = {inv_idx}, hashes = {hashes}")
+#     num_hashes = unique_hashes.shape[0]
+
+#     batch = hashes.shape[0]
+#     positions = sx.range(batch, dtype=inv_idx.dtype)
+#     first_pos = sx.unsorted_segment_min(positions, inv_idx, num_segments=num_hashes)
+
+#     p_summed = semiring.segment_sum(values=p, segment_ids=inv_idx, num_segments=num_hashes)
+#     # XXX Not correct, we do not want the semiring segment_sum
+#     t_summed = semiring.segment_sum(values=tensor, segment_ids=inv_idx, num_segments=num_hashes)
+
+#     return first_pos, p_summed, t_summed
+
+
+import numpy as np
+# import dice9.backends.numpy_impl as sx
+
+def expectation(tensor, conditions, p, hash_fn, semiring: Semiring):
+    """
+    For each row i, compute E[tensor | conditions] over all rows j
+    with identical `conditions` (as determined by `hash_fn`), and
+    return the result as a tensor e with e[i] = that conditional
+    expectation.
+
+    tensor:     shape (N,) – observable whose conditional expectation we want
+    conditions: list of tensors, each shape (N,) – "group by" columns
+    p:          shape (N,) – weights / probabilities
+    hash_fn:    function(conditions_64) -> shape (N,) hashes (injective on rows)
+    semiring:   Semiring used *only* for operations on p
+    """
+    # Treat everything as 1D vectors of the same length
+    tensor = np.asarray(tensor)
+    p = np.asarray(p)
+
+    num_rows = semiring.len(p)
+    if tensor.shape[0] != num_rows:
+        raise ValueError("tensor and p must have the same length")
+
+    # No conditions → just unconditional expectation, broadcast to all rows
+    if not conditions:
+        # semiring only used on p; expectation itself is ordinary arithmetic
+        denom = semiring.add_reduce(p, keepdims=False)
+        num = np.sum(p * tensor)
+        e_scalar = num / denom
+        return np.full_like(tensor, e_scalar, dtype=np.result_type(tensor, p))
+
+    # Make sure conditions are arrays and conform them for hashing (like marginalize)
+    conds = [np.asarray(c) for c in conditions]
+    for c in conds:
+        if c.shape[0] != num_rows:
+            raise ValueError("all conditions must have the same length as p")
+
+    conds_64 = [conform_to_64(c) for c in conds]
+
+    # Group rows by hashing the condition-tuple for each row
+    hashes = hash_fn(conds_64)          # shape (N,)
+    unique_hashes, inv_idx = sx.unique(hashes)
+    num_groups = unique_hashes.shape[0]
+
+    # Denominator per group: sum of probabilities in that group
+    # This is the only place we use semiring.segment_sum.
+    denom = semiring.segment_sum(
+        values=p,
+        segment_ids=inv_idx,
+        num_segments=num_groups,
+    )
+
+    # Numerator per group: sum_j p[j] * tensor[j] over the group.
+    # This is plain numpy arithmetic, NOT semiring.
+    # XXX This is problematic, we probably need a "scale by p"
+    # which is allowed to throw exceptions.
+    weighted = p * tensor               # elementwise, numpy-style
+    numer = np.zeros(num_groups, dtype=np.result_type(weighted))
+    # np.add.at does a segment_sum at C-speed, no Python loop:
+    np.add.at(numer, inv_idx, weighted)
+
+    # Conditional expectation per group
+    e_group = numer / denom             # shape (num_groups,)
+
+    # Broadcast back to rows: row i gets its group's expectation
+    e = e_group[inv_idx]                # shape (N,)
+    return e
 
 def marginalize(p, kept_vars, semiring: Semiring):
     orig_vars = kept_vars
-    # This is wrong xxx
-    #kept_vars = [sx.cast(v, sx.int64) for v in kept_vars]
     kept_vars = map(conform_to_64, kept_vars)
 
     s = semiring

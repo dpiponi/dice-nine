@@ -33,6 +33,7 @@ from .environment import Environment, is_reg
 from .frame import Frame
 from .exceptions import InterpreterError, FoundReturn
 from .analysis import move_analysis
+from .factor import expectation, hash_tensors
 
 from .utils import is_gen_fun, get_signature_from_functiondef, report_error, lift_axis
 
@@ -212,6 +213,7 @@ class Interpreter(ast.NodeVisitor):
             "__all__": self.call__all__,
             "zip": self.call_zip,
             "importance": self.call_importance,
+            "E": self.call_expectation,
         }
 
     def run(self, node, context: Context):
@@ -922,6 +924,23 @@ class Interpreter(ast.NodeVisitor):
     def builtin_dd(self, node, context: Context):
         sides_register = self.visit_with(node.args[0], context)
         return self.env.dd(sides_register)
+
+    def call_expectation(self, node, context: Context):
+        print(f"node.args={node.args}")
+        value_register = self.visit_with(node.args[0], context)
+        condition_registers = [self.visit_with(elt, context) for elt in node.args[1:]]
+        print(f"value_register={value_register}")
+        print(f"condition_registers={condition_registers}")
+        new_factor = self.env.common_factor([value_register, *condition_registers])
+        print(f"factor={new_factor}")
+        value = new_factor[value_register]
+        print(f"value={value}")
+        conditions = [new_factor[condition] for condition in condition_registers]
+        print(f"conditions={conditions}")
+        e = expectation(value, conditions, new_factor.p, hash_tensors, self.semiring)
+        destination = Register.new()
+        new_factor[destination] = e
+        return destination
 
     def call__reduce__(self, node, context: Context, op):
         reg = self.visit_with(node.args[0], context)
