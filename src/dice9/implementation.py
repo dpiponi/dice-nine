@@ -33,7 +33,7 @@ from .environment import Environment, is_reg
 from .frame import Frame
 from .exceptions import InterpreterError, FoundReturn
 from .analysis import move_analysis
-from .factor import expectation, hash_tensors
+from .factor import expectation, hash_tensors, probability
 
 from .utils import is_gen_fun, get_signature_from_functiondef, report_error, lift_axis
 
@@ -214,6 +214,7 @@ class Interpreter(ast.NodeVisitor):
             "zip": self.call_zip,
             "importance": self.call_importance,
             "E": self.call_expectation,
+            "P": self.call_probability,
         }
 
     def run(self, node, context: Context):
@@ -927,7 +928,7 @@ class Interpreter(ast.NodeVisitor):
 
     def call_expectation(self, node, context: Context):
         print(f"node.args={node.args}")
-        value_register = self.visit_with(node.args[0], context)
+        value_register = self.env.promote(self.visit_with(node.args[0], context))
         condition_registers = [self.visit_with(elt, context) for elt in node.args[1:]]
         print(f"value_register={value_register}")
         print(f"condition_registers={condition_registers}")
@@ -940,6 +941,19 @@ class Interpreter(ast.NodeVisitor):
         e = expectation(value, conditions, new_factor.p, hash_tensors, self.semiring)
         destination = Register.new()
         new_factor[destination] = e
+        return destination
+
+    def call_probability(self, node, context: Context):
+        print(f"node.args={node.args}")
+        condition_registers = [self.visit_with(elt, context) for elt in node.args]
+        print(f"condition_registers={condition_registers}")
+        new_factor = self.env.common_factor(condition_registers)
+        print(f"factor={new_factor}")
+        conditions = [new_factor[condition] for condition in condition_registers]
+        print(f"conditions={conditions}")
+        p = probability(conditions, new_factor.p, hash_tensors, self.semiring)
+        destination = Register.new()
+        new_factor[destination] = p
         return destination
 
     def call__reduce__(self, node, context: Context, op):

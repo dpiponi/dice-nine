@@ -453,3 +453,33 @@ def binomial(n, k, m):
         if i < n:
             count += d[0:0:k, 1 : 1 : m - k] == 0
     return count
+
+def log_impl(interpreter, context, x_register):
+    return interpreter.un_op(x_register, sx.log)
+
+
+def log(array):
+    r"""Computes the logolute value of an array.
+
+    Given an array of values, this operation returns an
+    array of the same type, where each element contains the logolute value of the
+    corresponding element in the input.
+  
+    For example:
+
+    >>> import dice9 as d9
+    >>> @d9.dist
+    >>> def main():
+    >>>     return 2 * d(2) - 3
+    >>> print(main())
+    {-1: np.float64(0.5), 1: np.float64(0.5)}
+  
+    Args:
+      array: An array.
+  
+    Returns:
+      An array of the same size, type and sparsity as arrayx`,
+        with logolute values.
+    """
+
+    return __inline_impl__(log_impl, array)

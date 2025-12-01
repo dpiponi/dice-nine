@@ -214,6 +214,68 @@ def expectation(tensor, conditions, p, hash_fn, semiring: Semiring):
     e = e_group[inv_idx]                # shape (N,)
     return e
 
+
+# import numpy as np
+# import dice9.backends.numpy_impl as sx
+
+def probability(conditions, p, hash_fn, semiring: Semiring):
+    """
+    Given per-row probabilities p[i] and a list of condition tensors,
+    return an array prob[i] where prob[i] is the total probability mass
+    of all rows j that share the same condition tuple as row i.
+
+    conditions: list of tensors, each shape (N,)
+    p:          shape (N,) – probabilities / weights
+    hash_fn:    function(conditions_64) -> shape (N,) hashes
+    semiring:   Semiring used only for aggregations on p
+    """
+    p = np.asarray(p)
+    num_rows = semiring.len(p)
+
+    if num_rows == 0:
+        return p  # nothing to do
+
+    # No conditions: everything is one equivalence class.
+    # Probability of that (assuming normalized p) is Σ p,
+    # so broadcast the total to all rows.
+    if not conditions:
+        total = semiring.add_reduce(p, keepdims=False)
+        return np.full_like(p, total)
+
+    # Make sure condition tensors are arrays of matching length
+    conds = [np.asarray(c) for c in conditions]
+    for c in conds:
+        if c.shape[0] != num_rows:
+            raise ValueError("all conditions must have the same length as p")
+
+    # Conform to 64-bit for hashing, like in marginalize / dedupe_and_aggregate
+    conds_64 = [conform_to_64(c) for c in conds if len(c) > 0]
+
+    if not conds_64:
+        # All condition tensors were empty → same as no conditions
+        total = semiring.add_reduce(p, keepdims=False)
+        return np.full_like(p, total)
+
+    # Hash condition rows → one hash per row
+    hashes = hash_fn(conds_64)  # shape (N,)
+
+    # unique_hashes: one per group
+    # inv_idx[i]: index of the group that row i belongs to
+    unique_hashes, inv_idx = sx.unique(hashes)
+    num_groups = unique_hashes.shape[0]
+
+    # Sum probabilities per group using the semiring
+    group_prob = semiring.segment_sum(
+        values=p,
+        segment_ids=inv_idx,
+        num_segments=num_groups,
+    )  # shape (num_groups,)
+
+    # Broadcast group probability back to each row:
+    # prob[i] = group_prob[inv_idx[i]]
+    prob = group_prob[inv_idx]  # or sx.gather(group_prob, inv_idx)
+    return prob
+
 def marginalize(p, kept_vars, semiring: Semiring):
     orig_vars = kept_vars
     kept_vars = map(conform_to_64, kept_vars)

@@ -39,9 +39,10 @@ print(f"result = {e}")
 
 @d9.dist
 def main():
-    x = d(6)
-    y = 0 * x
-    return E(x, y)
+    x = d(2)
+    y = d(2)
+    return -E(log(P(x, y)))
 
 pmf = main()
-print(pmf)
+for i, j in pmf.items():
+    print(i, j)

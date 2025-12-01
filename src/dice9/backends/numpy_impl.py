@@ -457,6 +457,7 @@ Tensor = np.ndarray
 
 # Numpy ops & small shims
 abs = np.abs
+log = np.log
 add = np.add
 argmin = np.argmin
 argmax = np.argmax
