@@ -1,3 +1,6 @@
+# fmt: off
+# type: ignore
+
 # import time
 # from tabulate import tabulate
 import logging
@@ -37,11 +40,37 @@ e = d9.factor.expectation(l, [i, j], p, d9.factor.hash_tensors, d9.Real64())
 
 print(f"result = {e}")
 
+d = None
+E = None
+P = None
+# log = None
+
+def transition(x):
+    if x == 0:
+        if d(2) == 1:
+            x = 1
+        else:
+            x = 0
+    else:
+        if d(4) == 1:
+            x = 1
+        else:
+            x = 0
+    return x
+            
 @d9.dist
 def main():
-    x = d(2)
-    y = d(2)
-    return -E(log(P(x, y)))
+    x = d(2) - 1
+    x0 = x
+
+    x1 = transition(x0)
+    x2 = transition(x1)
+    x3 = transition(x2)
+
+    kl1 = E[E[log(P(x1, x2) / P(x2)) : x2]]
+    kl2 = E[E[E[log(P(x1, x2, x) / P(x2, x)) : x2, x] : x]]
+    return kl1, kl2
+
 
 pmf = main()
 for i, j in pmf.items():

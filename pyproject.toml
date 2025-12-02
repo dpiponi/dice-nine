@@ -1,15 +1,13 @@
-[build-system]
-requires = ["hatchling>=1.25"]
-build-backend = "hatchling.build"
-
 [project]
-name = "dice-nine"
-version = "0.9.4"
+name = "dice9"
+version = "0.9.5"
 description = "Machine precision probabilities for RPG dice and combinatorics without Monte Carlo."
+authors = [
+    {name = "Dan Piponi",email = "dpiponi@gmail.com"}
+]
+license = {text = "LICENSE"}
 readme = "README.md"
-requires-python = ">=3.12"
-license = { file = "LICENSE" }
-authors = [{ name = "Dan Piponi" }]
+requires-python = ">=3.13"
 keywords = ["probability", "dice", "RPG", "combinatorics"]
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -18,22 +16,32 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Mathematics",
 ]
 dependencies = [
-  "numpy>=1.23",
-  "rich>=13",
+    "numpy (>=2.3.5,<3.0.0)",
+    "rich (>=14.2.0,<15.0.0)",
+    "ipython (>=9.7.0,<10.0.0)",
+    "ty (>=0.0.1a29,<0.0.2)",
+    "jedi-language-server (>=0.46.0,<0.47.0)"
 ]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [project.urls]
 Homepage = "https://github.com/dpiponi/dice-nine"
 Documentation = "https://github.com/dpiponi/dice-nine#readme"
 Changelog = "https://github.com/dpiponi/dice-nine/releases"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/dice9"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-
 [tool.pyright]
 typeCheckingMode = "off"
 reportUnusedParameter = "none"
 reportUnusedVariable = "none"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.1,<10.0.0)"
+]

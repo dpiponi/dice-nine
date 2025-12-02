@@ -1214,10 +1214,58 @@ class Interpreter(ast.NodeVisitor):
                 s = self.lift(lambda x: sx.stack([x], 1))(s)
                 return self.builtin_multiroll(s, context, mode)
 
+    def separate_vars(self, range_expr, context:Context):
+        print(range_expr)
+        print(isinstance(range_expr, ast.Tuple))
+        condition_registers = []
+        in_values = True
+        match range_expr:
+            case ast.Tuple(elts):
+                # E[X, Y:Z, W, ...]
+                for elt in elts:
+                    print(f"elt={elt}")
+                    match elt:
+                        case ast.Slice(lower=lower, upper=upper):
+                            value_register = self.env.promote(self.visit_with(lower, context))
+                            first_condition_register = self.env.promote(self.visit_with(upper, context))
+                            condition_registers = [first_condition_register]
+                            in_values = False
+                        case _:
+                            if in_values:
+                                value_register = self.env.promote(self.visit_with(elt, context))
+                            else:
+                                condition_register = self.env.promote(self.visit_with(elt, context))
+                                condition_registers.append(condition_register)
+            case ast.Slice(upper=upper, lower=lower):
+                value_register = self.env.promote(self.visit_with(lower, context))
+                first_condition_register = self.env.promote(self.visit_with(upper, context))
+                condition_registers = [first_condition_register]
+            case _:
+                # Straight E[X}]
+                value_register = self.env.promote(self.visit_with(range_expr, context))
+
+        return value_register, condition_registers
+
+    def expectation_e(self, range_expr, context: Context):
+        print(range_expr)
+        print(isinstance(range_expr, ast.Tuple))
+        value_register, condition_registers = self.separate_vars(range_expr, context)
+
+        new_factor = self.env.common_factor([value_register, *condition_registers])
+        value = new_factor[value_register]
+        conditions = [new_factor[condition] for condition in condition_registers]
+        e = expectation(value, conditions, new_factor.p, hash_tensors, self.semiring)
+        destination = Register.new()
+        new_factor[destination] = e
+        return destination
+        
     def visit_subscript(self, node, context: Context):
         # Special case of d[...]
         if isinstance(node.value, ast.Name) and node.value.id == "d":
             return self.multiroll_d(node.slice, context)
+
+        if isinstance(node.value, ast.Name) and node.value.id == "E":
+            return self.expectation_e(node.slice, context)
 
         obj = self.visit_with(node.value, context)
         slice_node = node.slice
