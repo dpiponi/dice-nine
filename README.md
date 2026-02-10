@@ -6,17 +6,19 @@ probabilities, typically from gaming scenarios, without using Monte-Carlo sampli
 A very simple example is
 
 ```
+@d9.dist
 def f():
     return d(6)
 ```
 
-When called with `d9.run(f)` it returns a `dict` showing that each outcome has a probability of 1/6.
+When called with `f()` it returns a `dict` showing that each outcome has a probability of 1/6.
 
 It can solve problems in a single line that are challenging with other libraries. For example this
 code allows you to roll d10 `dice` times and summarise all of the probabilities of rolling combinations
 like one pair, two pairs, a triple, a triple with a pair and so on.
 
 ```
+@d9.dist
 def f(dice):
   return bincount(lazy_bincount(dice @ d(10), 11), 6)[2:]
 ```
@@ -24,6 +26,7 @@ def f(dice):
 You can simulate entire games within it. Here's a complete D&D (1e) fight:
 
 ```
+@d9.dist
 def f():
     hp1 = lazy_sum(36 @ d(8))
     hp2 = lazy_sum(18 @ d(8))
@@ -53,6 +56,7 @@ with 12 attack and 12 danger dice event though there are 6^24 = 4,738,381,338,32
 you can roll 24 dice.
 
 ```
+@d9.dist
 def f(a, d):
   # Roll `a` attack dice counting the number
   # of each type.
