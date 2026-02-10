@@ -60,19 +60,29 @@ you can roll 24 dice.
 def f(a, d):
   # Roll `a` attack dice counting the number
   # of each type.
+  # `actions[i]` is now the number of times `i` was rolled.
+  # Note that `dice-nine` arrays start at `0`.
   actions = lazy_bincount(a @ d(6), 7)
 
   # Roll `d` defense dice removing any matches from
   # from the attack dice.
+  # Each time a defense of `i` is rolled it is removed from
+  # from `actions[i]`.
   for i in d @ d(6):
     actions[i] = max(actions[i] - 1, 0)
 
   # Find the largest of the uneliminated dice.
   if reduce_all(actions == 0):
+    # If there were no dice left after elimination then
+    # return zero.
     result = 0
   else:
+    # Otherwise return the index of the last `action[i]`
+    # value greater than zero. Ie. the largest roll
+    # that survived the elimination stage.
     result = last(actions > 0)
-  # And count any sixes beyond the first.
+
+  # Additionally count any sixes beyond the first.
   boons = max(actions[6] - 1, 0)
   return (result, boons)
 ```
