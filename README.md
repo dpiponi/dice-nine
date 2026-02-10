@@ -28,7 +28,9 @@ You can simulate entire games within it. Here's a complete D&D (1e) fight:
 ```
 @d9.dist
 def f():
+    # Brachiosaurus (Monster Manual 1e p. 24)
     hp1 = lazy_sum(36 @ d(8))
+    # Tyrannosaurus Rex (Monster Manual 1e p.28)
     hp2 = lazy_sum(18 @ d(8))
 
     for i in range(14):
@@ -36,11 +38,13 @@ def f():
         if hp1 > 0 and d(20) > 1:
             hp2 = max(0, hp2 - lazy_sum((x for x in 5 @ d(4))))
 
-        if hp2 > 0: 
+        if hp2 > 0:
+            # Two claws...
             if d(20) > 1:
                 hp1 -= d(6)
             if d(20) > 1:
                 hp1 -= d(6)
+            # ...and a bite
             if d(20) > 1:
                 hp1 -= lazy_sum((x for x in 5 @ d(8)))
             hp1 = max(hp1, 0)
@@ -98,7 +102,9 @@ knowledge about probability theory. There are some small tricks to give it perfo
   - quickly forgets the past
     (by analyzing the code to find where it can safely delete stuff)
   - delays thinking about the future
-    (by using generators to compute stuff lazily)
+    (by using generators to compute stuff lazily. Eg. the use of `lazy_sum` in
+    the D&D fight above means we can roll 36 hit dice without having to enumerate
+    all ways to roll 36 dice.)
 
 The combination of these can give some surprisingly good results.
 
