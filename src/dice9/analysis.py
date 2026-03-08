@@ -144,8 +144,14 @@ class DupTracker(ast.NodeVisitor):
     def visit_BinOp(self, node):
         if isinstance(node.op, ast.MatMult):
             self.visit(node.left)
-            self.visit(node.right)
-            self.visit(node.right)
+            # For a simple RHS name, allow normal last-use analysis so this can
+            # become `n @ move(x)` when safe. For more complex RHS expressions,
+            # keep the conservative behavior and treat it as multiply used.
+            if isinstance(node.right, ast.Name):
+                self.visit(node.right)
+            else:
+                self.visit(node.right)
+                self.visit(node.right)
         else:
             self.visit(node.left)
             self.visit(node.right)

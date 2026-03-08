@@ -103,8 +103,10 @@ class Environment:
     def split(self, condition, keep_condition=False):
         env1 = Environment(self.semiring, [])
         env2 = Environment(self.semiring, [])
+        found_condition = False
         for factor in self.factors:
             if condition in factor:
+                found_condition = True
                 f1, f2 = factor.split(factor[condition])
                 if f1:
                     env1.factors.append(f1)
@@ -117,6 +119,8 @@ class Environment:
             else:
                 env1.factors.append(factor)
                 env2.factors.append(factor.clone())
+        if not found_condition:
+            raise ValueError(f"Register {condition} not found in environment")
         return env1 if f1 else None, env2 if f2 else None
 
     def semi_split(self, condition, keep_condition=False):

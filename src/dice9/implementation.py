@@ -689,6 +689,10 @@ class Interpreter(ast.NodeVisitor):
         for _ in range(n):
             yield self.visit_with(gen, context)
 
+    def matmult_moved_value(self, n, value, context):
+        for _ in range(n):
+            yield context.frame.duplicate_value(self.env, value)
+
     def visit_set(self, node, context):
         for element in node.elts:
             if isinstance(element, ast.Starred):
@@ -741,6 +745,19 @@ class Interpreter(ast.NodeVisitor):
                     node=node.left,
                     frame=context.frame,
                 )
+            # Support compiler-generated `n @ move(x)` for simple name `x`.
+            # This preserves `n @ x` behavior while allowing last-use
+            # optimization to consume `x`.
+            if (
+                isinstance(node.right, ast.Call)
+                and isinstance(node.right.func, ast.Name)
+                and node.right.func.id == "move"
+                and len(node.right.args) == 1
+                and isinstance(node.right.args[0], ast.Name)
+            ):
+                moved = self.visit_with(node.right, context)
+                gen_context = Context(context.frame.copy())
+                return self.matmult_moved_value(n, moved, gen_context)
             gen_context = Context(context.frame.copy())
             return self.matmult(n, node.right, gen_context)
 
@@ -1283,12 +1300,10 @@ def dist(f=None, **options):
         @functools.wraps(f)
         def wrapped(*args, _options=None, **kwargs):
             logging.debug("Starting execution with function `%s(args=%s, kwargs=%s)`.", f.__name__, args, kwargs)
-            nonlocal merged_options
-            if _options:
-                merged_options |= _options
+            effective_options = merged_options | (_options or {})
 
             context = {}
-            for module in merged_options["modules"]:
+            for module in effective_options["modules"]:
                 context.update(module.__dict__)
             context.update(f.__globals__)
 
@@ -1309,13 +1324,15 @@ def dist(f=None, **options):
 
             interpreter = Interpreter(
                 parsed,
-                semiring=merged_options["semiring"],
-                traceback=merged_options["traceback"],
+                semiring=effective_options["semiring"],
+                traceback=effective_options["traceback"],
+                static_analyse=effective_options["static_analyse"],
+                show_analysis=effective_options["show_analysis"],
                 globals=context,
             )
 
-            if merged_options["static_analyse"]:
-                interpreter.analyse(source, show_analysis=merged_options["show_analysis"])
+            if effective_options["static_analyse"]:
+                interpreter.analyse(source, show_analysis=effective_options["show_analysis"])
 
             frame = Frame(interpreter.semiring, source, {}, 0)
             ctx = Context(frame)
@@ -1337,7 +1354,7 @@ def dist(f=None, **options):
                 else:
                     values = interpreter.promote(values)
                 logging.debug("return `%s`", values)
-                return interpreter.env.distribution(values, merged_options["normalize"])
+                return interpreter.env.distribution(values, effective_options["normalize"])
             except InterpreterError as exc:
                 node = exc.node if exc.node else interpreter.node
                 report_error(exc, node, exc.frame.source)
