@@ -1,5 +1,4 @@
 import ast
-from typing import Set
 from .exceptions import InterpreterError
 import logging
 
@@ -201,25 +200,25 @@ def move_analysis(tree):
 def names_in_expr(node):
     class Visitor(ast.NodeVisitor):
         def __init__(self):
-            self.names: Set[str] = set()
+            self.names = set()
 
-        def visit_Name(self, n: ast.Name):
-            if isinstance(n.ctx, ast.Load):
-                self.names.add(n.id)
+        def visit_Name(self, node: ast.Name):
+            if isinstance(node.ctx, ast.Load):
+                self.names.add(node.id)
 
-        def visit_Call(self, n: ast.Call):
-            if not isinstance(n.func, ast.Name):
-                self.visit(n.func)
-            for arg in n.args:
+        def visit_Call(self, node: ast.Call):
+            if not isinstance(node.func, ast.Name):
+                self.visit(node.func)
+            for arg in node.args:
                 self.visit(arg)
-            for kw in n.keywords:
+            for kw in node.keywords:
                 if kw.value is not None:
                     self.visit(kw.value)
 
-        def visit_Subscript(self, n: ast.Subscript):
-            if not (isinstance(n.value, ast.Name) and n.value.id == "d"):
-                self.visit(n.value)
-            self._visit_slice(n.slice)
+        def visit_Subscript(self, node: ast.Subscript):
+            if not (isinstance(node.value, ast.Name) and node.value.id == "d"):
+                self.visit(node.value)
+            self._visit_slice(node.slice)
 
         def _visit_slice(self, s):
             if isinstance(s, ast.AST):
@@ -228,36 +227,38 @@ def names_in_expr(node):
                     if s.upper: self.visit(s.upper)
                     if s.step:  self.visit(s.step)
                 elif isinstance(s, ast.ExtSlice):
-                    for dim in s.dims: self._visit_slice(dim)
+                    for dim in s.dims:
+                        self._visit_slice(dim)
                 elif isinstance(s, ast.Index):
                     self.visit(s.value)
                 else:
                     self.visit(s)
 
-        def visit_ListComp(self, n: ast.ListComp):
-            for gen in n.generators:
+        def visit_ListComp(self, node: ast.ListComp):
+            for gen in node.generators:
                 self.visit(gen.iter)
                 for cond in gen.ifs: self.visit(cond)
-            self.visit(n.elt)
+            self.visit(node.elt)
 
-        def visit_SetComp(self, n: ast.SetComp):
-            for gen in n.generators:
+        def visit_SetComp(self, node: ast.SetComp):
+            for gen in node.generators:
                 self.visit(gen.iter)
                 for cond in gen.ifs: self.visit(cond)
-            self.visit(n.elt)
+            self.visit(node.elt)
 
-        def visit_GeneratorExp(self, n: ast.GeneratorExp):
-            for gen in n.generators:
+        def visit_GeneratorExp(self, node: ast.GeneratorExp):
+            for gen in node.generators:
                 self.visit(gen.iter)
                 for cond in gen.ifs: self.visit(cond)
-            self.visit(n.elt)
+            self.visit(node.elt)
 
-        def visit_DictComp(self, n: ast.DictComp):
-            for gen in n.generators:
+        def visit_DictComp(self, node: ast.DictComp):
+            for gen in node.generators:
                 self.visit(gen.iter)
-                for cond in gen.ifs: self.visit(cond)
-            self.visit(n.key)
-            self.visit(n.value)
+                for cond in gen.ifs:
+                    self.visit(cond)
+            self.visit(node.key)
+            self.visit(node.value)
 
     if not isinstance(node, ast.AST):
         raise TypeError("names_in_expr expects an ast.AST (expression)")

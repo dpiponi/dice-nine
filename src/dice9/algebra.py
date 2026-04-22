@@ -5,6 +5,7 @@ import dice9.backends.numpy_impl as sx
 import math
 from math import gcd
 import numpy as np
+from typing import Sequence
 
 prime_table = [
     32749, 32719, 32717, 32713, 32707, 32693, 32687, 32653, 32647, 32633, 32621,
@@ -37,10 +38,10 @@ prime_table = [
 class Semiring(ABC):
     """Operations on the probability axis."""
 
-    dtype = None
-
+    dtype : type
+    
     @abstractmethod
-    def ones(self, shape):
+    def ones(self, shape: Sequence[int]):
         ...
 
     @abstractmethod
@@ -52,7 +53,7 @@ class Semiring(ABC):
         ...
 
     @abstractmethod
-    def zeros(self, shape):
+    def zeros(self, shape : Sequence[int]):
         ...
 
     @abstractmethod
@@ -86,10 +87,10 @@ class Semiring(ABC):
         return x
 
     def argsort(self, a):
-        ...
+        return np.arange(self.len(a))
 
 
-# We're typically working with fields like ℤ/pℤ × ℤ/qℤ × ... × ℤ/rℤ
+# We're typically working with rings like ℤ/pℤ × ℤ/qℤ × ... × ℤ/rℤ
 # which allow you to divide by any integer not divisible by any of
 # p, q, ..., r. That's why it's "partial".
 class PartialField(Semiring):
@@ -107,7 +108,7 @@ class PartialField(Semiring):
 
 
 class BaseField(PartialField):
-    dtype = None
+    dtype : type
 
     def ones(self, shape):
         return sx.ones(shape, dtype=self.dtype)
@@ -176,7 +177,7 @@ class LogReal64(PartialField):
         return sx.zeros(shape, dtype=self.dtype)
 
     def zeros(self, shape):
-        return sx.full(shape, -math.inf, dtype=self.dtype)
+        return sx.fill(shape, -math.inf, dtype=self.dtype)
 
     def kronecker(self, a, b):
         m = self.len(a)
@@ -316,8 +317,8 @@ class BigInteger(CRTBase, Semiring):
         v = (int(num) % self.primes + self.primes) % self.primes
         return np.broadcast_to(v, (*shape, self.num_primes)).copy()
 
-    def as_scalar(self, v, bound=None):
-        m, t = self.apply_crt(v)
+    def as_scalar(self, x, bound=None):
+        m, t = self.apply_crt(x)
 
         if t > m // 2:
             t -= m
@@ -367,8 +368,8 @@ class BigFraction(CRTBase, PartialField):
     def divide(self, a, b):
         return (a * self.reciprocal(b)) % self.primes
 
-    def as_scalar(self, v, num_max=None, den_max=None):
-        m, t = self.apply_crt(v)
+    def as_scalar(self, x, num_max=None, den_max=None):
+        m, t = self.apply_crt(x)
 
         if num_max is None or den_max is None:
             b = isqrt((m - 1) // 2)
@@ -429,8 +430,8 @@ class SemiringProduct(PartialField):
         p2 = self.s2.kronecker(a[1], b[1])
         return (p1, p2)
 
-    def promote(self, a):
-        return (self.s1.promote(a), self.s2.promote(a))
+    def promote(self, x):
+        return (self.s1.promote(x), self.s2.promote(x))
 
     def zeros(self, shape):
         return (self.s1.zeros(shape), self.s2.zeros(shape))
@@ -462,8 +463,8 @@ class SemiringProduct(PartialField):
         return (self.s1.const_ratio(num, den, shape),
                 self.s2.const_ratio(num, den, shape))
 
-    def as_scalar(self, a):
-        return (self.s1.as_scalar(a[0]), self.s2.as_scalar(a[1]))
+    def as_scalar(self, x):
+        return (self.s1.as_scalar(x[0]), self.s2.as_scalar(x[1]))
 
     def get(self, a, i):
         return (self.s1.get(a[0], i), self.s2.get(a[1], i))

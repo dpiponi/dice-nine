@@ -6,8 +6,18 @@ from .environment import Environment
 from .exceptions import InterpreterError
 
 
-# Variables also serve as the connections to retie branches of conditionals.
 class Frame:
+
+    """
+    A `Frame` is essentially the mapping from variable names to
+    values, usually indirected via registers.
+
+    The `Frame` is also used to tie back together registers that
+    are split in conditional branches.
+
+    A `Frame` isn't tied to any particular `Environment` which is
+    where the values of registers are stored.
+    """
 
     def __init__(self, semiring, source, allocations, conditional_depth):
         self.semiring = semiring
@@ -57,13 +67,34 @@ class Frame:
 
     # Creates new independent variable.
     def allocate_register(self, env, new_var_name, value):
+        """
+        Create a new independent random variable in the specified environment.
+
+        Args:
+            env: The environment in which the new register lives.
+            new_var_name: the name of the new variable.
+            value: the value of the new register and variable.
+        """
+        
         reg = env.allocate_register_with_definite_value(value)
         self._allocations[new_var_name] = reg
+        self.allocate_register
         return reg
 
     # Allocates new register to variable in same factor as previously
     # existing register.
     def allocate_in_same_factor_as_register(self, env, register, new_var_name, value):
+        """
+        Create a new variable in the specified environment in the same
+        factor as the given variable.
+
+        Args:
+            env: The environment in which the new register lives.
+            register: The register whose factor we want the new register in.
+            new_var_name: the name of the new variable.
+            value: the value of the new register and variable.
+        """
+
         factor = env.find_factor(register)
         new_register = Register.new()
         factor[new_register] = value
@@ -225,7 +256,7 @@ class Frame:
             new_reg = Register.new()
             pairs.append((src1, src2, new_reg))
             logging.debug(
-                "Merging %s in env #%s and %s in env #%s into %s",
+                "Merging %s in env #%s and %s in env #%s into %s"    ,
                 src1,
                 id(env1),
                 src2,

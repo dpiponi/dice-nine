@@ -6,17 +6,19 @@ probabilities, typically from gaming scenarios, without using Monte-Carlo sampli
 A very simple example is
 
 ```
+@d9.dist
 def f():
     return d(6)
 ```
 
-When called with `d9.run(f)` it returns a `dict` showing that each outcome has a probability of 1/6.
+When called with `f()` it returns a `dict` showing that each outcome has a probability of 1/6.
 
 It can solve problems in a single line that are challenging with other libraries. For example this
 code allows you to roll d10 `dice` times and summarise all of the probabilities of rolling combinations
 like one pair, two pairs, a triple, a triple with a pair and so on.
 
 ```
+@d9.dist
 def f(dice):
   return bincount(lazy_bincount(dice @ d(10), 11), 6)[2:]
 ```
@@ -24,8 +26,11 @@ def f(dice):
 You can simulate entire games within it. Here's a complete D&D (1e) fight:
 
 ```
+@d9.dist
 def f():
+    # Brachiosaurus (Monster Manual 1e p. 24)
     hp1 = lazy_sum(36 @ d(8))
+    # Tyrannosaurus Rex (Monster Manual 1e p.28)
     hp2 = lazy_sum(18 @ d(8))
 
     for i in range(14):
@@ -33,11 +38,13 @@ def f():
         if hp1 > 0 and d(20) > 1:
             hp2 = max(0, hp2 - lazy_sum((x for x in 5 @ d(4))))
 
-        if hp2 > 0: 
+        if hp2 > 0:
+            # Two claws...
             if d(20) > 1:
                 hp1 -= d(6)
             if d(20) > 1:
                 hp1 -= d(6)
+            # ...and a bite
             if d(20) > 1:
                 hp1 -= lazy_sum((x for x in 5 @ d(8)))
             hp1 = max(hp1, 0)
@@ -53,22 +60,33 @@ with 12 attack and 12 danger dice event though there are 6^24 = 4,738,381,338,32
 you can roll 24 dice.
 
 ```
+@d9.dist
 def f(a, d):
   # Roll `a` attack dice counting the number
   # of each type.
+  # `actions[i]` is now the number of times `i` was rolled.
+  # Note that `dice-nine` arrays start at `0`.
   actions = lazy_bincount(a @ d(6), 7)
 
   # Roll `d` defense dice removing any matches from
   # from the attack dice.
+  # Each time a defense of `i` is rolled it is removed from
+  # from `actions[i]`.
   for i in d @ d(6):
     actions[i] = max(actions[i] - 1, 0)
 
   # Find the largest of the uneliminated dice.
   if reduce_all(actions == 0):
+    # If there were no dice left after elimination then
+    # return zero.
     result = 0
   else:
+    # Otherwise return the index of the last `action[i]`
+    # value greater than zero. Ie. the largest roll
+    # that survived the elimination stage.
     result = last(actions > 0)
-  # And count any sixes beyond the first.
+
+  # Additionally count any sixes beyond the first.
   boons = max(actions[6] - 1, 0)
   return (result, boons)
 ```
@@ -84,7 +102,9 @@ knowledge about probability theory. There are some small tricks to give it perfo
   - quickly forgets the past
     (by analyzing the code to find where it can safely delete stuff)
   - delays thinking about the future
-    (by using generators to compute stuff lazily)
+    (by using generators to compute stuff lazily. Eg. the use of `lazy_sum` in
+    the D&D fight above means we can roll 36 hit dice without having to enumerate
+    all ways to roll 36 dice.)
 
 The combination of these can give some surprisingly good results.
 
@@ -105,3 +125,10 @@ RPG stackexchange as a source of test cases and in every
 case either dice-nine agrees with the results there or I disagree with how to interpret the question.
 
 I collected the test cases on [colab](https://colab.research.google.com/drive/1sOh3Ie_uD2RXVKGoFZ3MZwXN-t9_5KCQ?usp=sharing).
+
+Installation
+------------
+For the moment it's on `test.pypi` so you can install with
+```
+pip install -i https://test.pypi.org/simple --extra-index-url https://pypi.org/simple dice-nine
+```
