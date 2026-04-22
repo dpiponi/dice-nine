@@ -1,12 +1,16 @@
+# pyright: reportUndefinedVariable=false, reportGeneralTypeIssues=false
+
 import ast
 import textwrap
 
+import numpy as np
 import pytest
 import dice9 as d9
 
 from dice9.analysis import move_analysis
 from dice9.environment import Environment
 from dice9.factor import Register
+from dice9.factor import Factor
 
 
 def test_dist_call_options_do_not_leak_across_calls():
@@ -100,3 +104,16 @@ def test_shadowrun_six_die_pool_hits():
     # Binomial(n=6, p=1/3)
     assert pmf[0] == pytest.approx((2 / 3) ** 6)
     assert pmf[3] == pytest.approx(160 / 729)
+
+
+def test_bigfraction_factor_rich_can_sort_rows():
+    semiring = d9.BigFraction(64)
+    probs = semiring.concat([
+        semiring.const_ratio(1, 3, (1,)),
+        semiring.const_ratio(2, 3, (1,)),
+    ])
+    factor = Factor(semiring, probs, {Register.new(): np.array([10, 20])})
+
+    table = factor.rich()
+
+    assert table is not None

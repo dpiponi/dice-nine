@@ -86,7 +86,7 @@ class Semiring(ABC):
         return x
 
     def argsort(self, a):
-        return np.range(self.len(a))
+        ...
 
 
 # We're typically working with fields like ℤ/pℤ × ℤ/qℤ × ... × ℤ/rℤ
@@ -204,6 +204,9 @@ class LogReal64(PartialField):
 
     def segment_sum(self, values, segment_ids, num_segments):
         return sx.unsorted_segment_logsumexp(values, segment_ids, num_segments)
+
+    def argsort(self, a):
+        return np.argsort(a, axis=-1)
 
     # Tricky. I'm making promote take the log but
     # as_scalar won't. So we mustn't think of these as
@@ -324,6 +327,9 @@ class BigInteger(CRTBase, Semiring):
 
         return t
 
+    def argsort(self, a):
+        return np.argsort([self.as_scalar(v) for v in a])
+
 
 class BigFraction(CRTBase, PartialField):
     has_division = True
@@ -390,6 +396,9 @@ class BigFraction(CRTBase, PartialField):
             raise ValueError("Unable to reconstruct rational from residues.")
 
         return Fraction(num, den)
+
+    def argsort(self, a):
+        return np.argsort([self.as_scalar(v) for v in a])
 
 
 def constant_one(semiring, shape=(1,)):
@@ -458,6 +467,9 @@ class SemiringProduct(PartialField):
 
     def get(self, a, i):
         return (self.s1.get(a[0], i), self.s2.get(a[1], i))
+
+    def argsort(self, a):
+        return np.argsort([self.as_scalar(self.get(a, i)) for i in range(self.len(a))])
 
 # class Dual(PartialField):
 # 

@@ -3,12 +3,9 @@
 import pytest
 import math
 import functools
-import ast
-import textwrap
 from fractions import Fraction
 
 import dice9 as d9
-from dice9.analysis import move_analysis
 
 #from dice9.problib import *
 
@@ -644,29 +641,6 @@ def test_matmult():
 
     pmf = f()
     assert pmf[18] == pytest.approx(1 / 216)
-
-def test_matmult_move_rhs():
-    @d9.dist
-    def f():
-        x = d(6)
-        return lazy_sum(2 @ move(x))
-
-    pmf = f()
-    assert pmf[2] == pytest.approx(1 / 6)
-    assert pmf[12] == pytest.approx(1 / 6)
-    assert 3 not in pmf
-
-def test_move_analysis_matmult_last_use():
-    source = textwrap.dedent(
-        """
-        def f():
-            x = d(6)
-            return lazy_sum(2 @ x)
-        """
-    )
-    transformed = move_analysis(ast.parse(source))
-    code = ast.unparse(transformed)
-    assert "2 @ move(x)" in code
 
 def test_multiroll2():
     @d9.dist

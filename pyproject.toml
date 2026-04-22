@@ -37,3 +37,4 @@ testpaths = ["tests"]
 typeCheckingMode = "off"
 reportUnusedParameter = "none"
 reportUnusedVariable = "none"
+exclude = ["**/*.d9.py"]

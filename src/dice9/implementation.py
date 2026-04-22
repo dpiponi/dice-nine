@@ -689,10 +689,6 @@ class Interpreter(ast.NodeVisitor):
         for _ in range(n):
             yield self.visit_with(gen, context)
 
-    def matmult_moved_value(self, n, value, context):
-        for _ in range(n):
-            yield context.frame.duplicate_value(self.env, value)
-
     def visit_set(self, node, context):
         for element in node.elts:
             if isinstance(element, ast.Starred):
@@ -745,19 +741,6 @@ class Interpreter(ast.NodeVisitor):
                     node=node.left,
                     frame=context.frame,
                 )
-            # Support compiler-generated `n @ move(x)` for simple name `x`.
-            # This preserves `n @ x` behavior while allowing last-use
-            # optimization to consume `x`.
-            if (
-                isinstance(node.right, ast.Call)
-                and isinstance(node.right.func, ast.Name)
-                and node.right.func.id == "move"
-                and len(node.right.args) == 1
-                and isinstance(node.right.args[0], ast.Name)
-            ):
-                moved = self.visit_with(node.right, context)
-                gen_context = Context(context.frame.copy())
-                return self.matmult_moved_value(n, moved, gen_context)
             gen_context = Context(context.frame.copy())
             return self.matmult(n, node.right, gen_context)
 
